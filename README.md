@@ -1,4 +1,4 @@
-# EquipoDinamita - Proyecto CS2013
+# EquipoDinamita - Proyecto CS2013_2026-2
 
 ## 🚀 Configuración y Compilación
 
