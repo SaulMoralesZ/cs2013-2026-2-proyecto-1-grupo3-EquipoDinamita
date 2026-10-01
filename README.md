@@ -157,7 +157,8 @@ cmake ..
 ---
 
 ## 👥 Contribuyentes
-- Equipo Dinamita
+- Saul Morales
+- Rafael Vargas
 
 ---
 
