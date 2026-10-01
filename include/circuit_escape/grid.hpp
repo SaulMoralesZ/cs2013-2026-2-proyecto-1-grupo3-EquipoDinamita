@@ -8,64 +8,9 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-
+#include "./position.hpp"
 namespace circuit_escape {
 
-// ------------------------------------------------------ Posición y acción
-struct Position {
-    std::size_t row{};
-    std::size_t column{};
-    friend bool operator==(const Position&, const Position&) = default;
-};
-
-struct PositionHash {
-    std::size_t operator()(const Position& p) const noexcept {
-        return std::hash<std::size_t>{}(p.row) * 1000003u ^
-               std::hash<std::size_t>{}(p.column);
-    }
-};
-
-enum class Action { up, down, left, right, wait };
-
-// No conoce el tamaño del tablero: solo falla ante coordenadas negativas.
-[[nodiscard]] inline std::optional<Position> neighbor(Position origin, Action action) {
-    switch (action) {
-        case Action::up:
-            if (origin.row == 0) return std::nullopt;
-            return Position{origin.row - 1, origin.column};
-        case Action::down:
-            return Position{origin.row + 1, origin.column};
-        case Action::left:
-            if (origin.column == 0) return std::nullopt;
-            return Position{origin.row, origin.column - 1};
-        case Action::right:
-            return Position{origin.row, origin.column + 1};
-        case Action::wait:
-            return origin;
-    }
-    return std::nullopt;
-}
-
-[[nodiscard]] inline std::string toString(Position position) {
-    return "(" + std::to_string(position.row) + "," +
-           std::to_string(position.column) + ")";
-}
-
-[[nodiscard]] inline std::string_view toString(Action action) {
-    switch (action) {
-        case Action::up: return "arriba";
-        case Action::down: return "abajo";
-        case Action::left: return "izquierda";
-        case Action::right: return "derecha";
-        case Action::wait: return "esperar";
-    }
-    return "?";
-}
-
-[[nodiscard]] inline std::size_t manhattan(Position a, Position b) noexcept {
-    const auto diff = [](std::size_t x, std::size_t y) { return x > y ? x - y : y - x; };
-    return diff(a.row, b.row) + diff(a.column, b.column);
-}
 
 // ------------------------------------------------------------------ Grid
 template<typename CellType, std::size_t Rows, std::size_t Columns>

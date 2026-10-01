@@ -35,7 +35,7 @@ Action HeuristicPolicy::selectAction(const Observation& observation,
         const Position next = neighbor(observation.agent, action).value_or(observation.agent);
         const auto it = visits_.find(next);
         const int visited = it == visits_.end() ? 0 : it->second;
-        return -static_cast<int>(manhattan(next, observation.goal)) - 2 * visited;
+        return -static_cast<int>(manhattanDistance(next, observation.goal)) - 2 * visited;
     };
 
     return bestAction(moves.begin(), moves.end(), score).value_or(Action::wait);
