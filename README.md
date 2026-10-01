@@ -91,6 +91,7 @@ proyecto/
 ## 📚 Librerías
 
 - **FTXUI v7.0.3**: Interfaz de terminal interactiva (se descarga automáticamente)
+    o con sudo apt install libftxui-dev (Ubuntu/debian base)
 - **C++20**: Estándar de lenguaje usado en el proyecto
 
 ---
