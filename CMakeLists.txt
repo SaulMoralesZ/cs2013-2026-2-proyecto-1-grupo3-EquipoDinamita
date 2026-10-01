@@ -8,6 +8,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(CIRCUIT_ESCAPE_WITH_UI "Construye el ejecutable de consola con FTXUI" ON)
 
+set(CIRCUIT_ESCAPE_RUNTIME_DLLS "")
+if(MINGW)
+    foreach(dll IN ITEMS libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll)
+        execute_process(
+                COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=${dll}
+                OUTPUT_VARIABLE dll_path
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(IS_ABSOLUTE "${dll_path}" AND EXISTS "${dll_path}")
+            list(APPEND CIRCUIT_ESCAPE_RUNTIME_DLLS "${dll_path}")
+        endif()
+    endforeach()
+endif()
+
 function(circuit_escape_configure target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4)
@@ -15,8 +29,14 @@ function(circuit_escape_configure target)
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    if(MINGW)
-        target_link_options(${target} PRIVATE -static)
+    get_target_property(target_type ${target} TYPE)
+    if(MINGW AND target_type STREQUAL "EXECUTABLE" AND CIRCUIT_ESCAPE_RUNTIME_DLLS)
+        add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CIRCUIT_ESCAPE_RUNTIME_DLLS}
+                "$<TARGET_FILE_DIR:${target}>"
+                VERBATIM
+        )
     endif()
 endfunction()
 
@@ -67,3 +87,13 @@ foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)
              COMMAND ${test_name}
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
+
+# Prueba de la interfaz
+if(CIRCUIT_ESCAPE_WITH_UI)
+    add_executable(ui_test tests/ui_test.cpp)
+    target_link_libraries(ui_test PRIVATE circuit_escape_ui)
+    circuit_escape_configure(ui_test)
+    add_test(NAME ui_test
+            COMMAND ui_test
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
