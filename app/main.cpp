@@ -126,6 +126,7 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
     bool showHelp = false;
 
     auto screen = ftxui::ScreenInteractive::TerminalOutput();
+    screen.TrackMouse(false);
 
     const auto advance = [&](Action action) {
         if (environment.isFinished()) {
@@ -151,6 +152,7 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
     });
 
     document = ftxui::CatchEvent(document, [&](const ftxui::Event& event) {
+        if (!ConsoleUI::isKeyboardEvent(event)) return false;
         const auto command = ui.translate(event);
         if (!command) {
             notice = "Comando desconocido. WASD mover, E esperar, H ayuda, Q salir.";
