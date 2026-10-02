@@ -84,6 +84,16 @@ foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)
     target_link_libraries(${test_name} PRIVATE circuit_escape)
     circuit_escape_configure(${test_name})
     add_test(NAME ${test_name}
-            COMMAND ${test_name}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+             COMMAND ${test_name}
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
+
+# Prueba de la interfaz
+if(CIRCUIT_ESCAPE_WITH_UI)
+    add_executable(ui_test tests/ui_test.cpp)
+    target_link_libraries(ui_test PRIVATE circuit_escape_ui)
+    circuit_escape_configure(ui_test)
+    add_test(NAME ui_test
+            COMMAND ui_test
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
