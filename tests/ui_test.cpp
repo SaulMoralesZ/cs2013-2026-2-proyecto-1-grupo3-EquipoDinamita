@@ -58,6 +58,26 @@ void comandoDesconocidoSeRechaza() {
     assert(!ui.translate(ftxui::Event::Tab));
 }
 
+void soloElTecladoCuentaComoComando() {
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Character("w")));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Character("x")));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::ArrowUp));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Escape));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Tab));
+
+    ftxui::Mouse movimiento;
+    movimiento.button = ftxui::Mouse::None;
+    movimiento.motion = ftxui::Mouse::Moved;
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Mouse("", movimiento)));
+
+    ftxui::Mouse rueda;
+    rueda.button = ftxui::Mouse::WheelUp;
+    rueda.motion = ftxui::Mouse::Pressed;
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Mouse("", rueda)));
+
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Custom));
+}
+
 std::vector<Cell> lasSieteCeldas() {
     return {Cell{Empty{}},          Cell{Wall{}},    Cell{RoughTerrain{}},
             Cell{ResourceCell<int>{}}, Cell{Battery{}}, Cell{Trap{}},
@@ -176,5 +196,6 @@ int main() {
     glifosAsciiExactos();
     consumiblesUsadosSeVenLibres();
     tableroDe20x30Ocupa62Columnas();
+    soloElTecladoCuentaComoComando();
     return 0;
 }

@@ -67,6 +67,11 @@ std::optional<UiCommand> ConsoleUI::translate(const ftxui::Event& event) const {
     return std::nullopt;
 }
 
+bool ConsoleUI::isKeyboardEvent(const ftxui::Event& event) {
+    return !event.is_mouse() && !event.is_cursor_position() &&
+           !event.is_cursor_shape() && event != ftxui::Event::Custom;
+}
+
 std::string ConsoleUI::emptyGlyph() const {
     return mode_ == RenderMode::ascii ? "." : std::string(kEmojiEmpty);
 }

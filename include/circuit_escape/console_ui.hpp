@@ -43,6 +43,8 @@ public:
     [[nodiscard]] std::string agentGlyph() const;
     [[nodiscard]] std::string emptyGlyph() const;
     [[nodiscard]] std::string coordinateLabel(std::size_t index) const;
+    
+    [[nodiscard]] static bool isKeyboardEvent(const ftxui::Event& event);
 
     [[nodiscard]] ftxui::Element help() const;
     [[nodiscard]] ftxui::Element notice(const std::string& text) const;
