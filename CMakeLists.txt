@@ -41,9 +41,9 @@ function(circuit_escape_configure target)
 endfunction()
 
 add_library(circuit_escape STATIC
-    src/position.cpp
-    src/environment.cpp
-    src/controllers.cpp
+        src/position.cpp
+        src/environment.cpp
+        src/controllers.cpp
 )
 target_include_directories(circuit_escape PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 circuit_escape_configure(circuit_escape)
@@ -51,17 +51,17 @@ circuit_escape_configure(circuit_escape)
 if(CIRCUIT_ESCAPE_WITH_UI)
     include(FetchContent)
     FetchContent_Declare(ftxui
-        GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI
-        GIT_TAG v7.0.3
+            GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI
+            GIT_TAG v7.0.3
     )
     FetchContent_MakeAvailable(ftxui)
 
     add_library(circuit_escape_ui STATIC src/console_ui.cpp)
     target_link_libraries(circuit_escape_ui PUBLIC
-        circuit_escape
-        ftxui::screen
-        ftxui::dom
-        ftxui::component
+            circuit_escape
+            ftxui::screen
+            ftxui::dom
+            ftxui::component
     )
     circuit_escape_configure(circuit_escape_ui)
 
@@ -73,10 +73,10 @@ endif()
 enable_testing()
 
 set(CIRCUIT_ESCAPE_TESTS
-    grid_test
-    environment_test
-    interactions_test
-    controllers_test
+        grid_test
+        environment_test
+        interactions_test
+        controllers_test
 )
 
 foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)
