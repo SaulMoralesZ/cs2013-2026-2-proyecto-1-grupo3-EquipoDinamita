@@ -14,7 +14,6 @@ using namespace circuit_escape;
 
 namespace {
 
-// Devuelve true si el evento se traduce exactamente a esa acción.
 bool traduceA(const ConsoleUI& ui, const ftxui::Event& event, Action esperada) {
     const auto comando = ui.translate(event);
     if (!comando) return false;
@@ -55,8 +54,28 @@ void comandoDesconocidoSeRechaza() {
     const ConsoleUI ui;
     assert(!ui.translate(ftxui::Event::Character("x")));
     assert(!ui.translate(ftxui::Event::Character("1")));
-    assert(!ui.translate(ftxui::Event::Character("wa")));  // más de un carácter
+    assert(!ui.translate(ftxui::Event::Character("wa")));
     assert(!ui.translate(ftxui::Event::Tab));
+}
+
+void soloElTecladoCuentaComoComando() {
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Character("w")));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Character("x")));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::ArrowUp));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Escape));
+    assert(ConsoleUI::isKeyboardEvent(ftxui::Event::Tab));
+
+    ftxui::Mouse movimiento;
+    movimiento.button = ftxui::Mouse::None;
+    movimiento.motion = ftxui::Mouse::Moved;
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Mouse("", movimiento)));
+
+    ftxui::Mouse rueda;
+    rueda.button = ftxui::Mouse::WheelUp;
+    rueda.motion = ftxui::Mouse::Pressed;
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Mouse("", rueda)));
+
+    assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Custom));
 }
 
 std::vector<Cell> lasSieteCeldas() {
@@ -74,8 +93,8 @@ void glifosDistintosEnAmbosModos() {
             assert(!glifo.empty());
             vistos.insert(glifo);
         }
-        assert(vistos.size() == 7);                    // cada celda se distingue
-        assert(vistos.count(ui.agentGlyph()) == 0);    // el agente también
+        assert(vistos.size() == 7);
+        assert(vistos.count(ui.agentGlyph()) == 0);
     }
 }
 
@@ -112,14 +131,12 @@ void tableroDe20x30Ocupa62Columnas() {
         auto documento = ui.render(entorno, sinEventos);
         auto pantalla = ftxui::Screen::Create(ftxui::Dimension::Fit(documento));
         ftxui::Render(pantalla, documento);
-        // 1 columna de coordenadas + 30 celdas, todas de ancho 2.
         assert(pantalla.dimx() == 62);
-        // barra de estado + regla superior + 20 filas + pie.
         assert(pantalla.dimy() == 23);
     }
 }
 
-}  // namespace
+}
 
 int main() {
     teclasDeMovimientoSinDistinguirMayusculas();
@@ -130,5 +147,6 @@ int main() {
     glifosAsciiExactos();
     consumiblesUsadosSeVenLibres();
     tableroDe20x30Ocupa62Columnas();
+    soloElTecladoCuentaComoComando();
     return 0;
 }
