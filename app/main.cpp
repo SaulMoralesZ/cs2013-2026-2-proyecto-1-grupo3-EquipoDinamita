@@ -1,7 +1,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <deque>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -21,8 +20,6 @@
 using namespace circuit_escape;
 
 namespace {
-
-constexpr std::size_t kRecentEvents = 8;
 
 struct Options {
     std::string scenario{"assets/maps/scenario_01.txt"};
@@ -121,7 +118,7 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
         controller = makeController(*options.controller, options.seed);
     }
 
-    std::deque<NavigationEvent> recent;
+    std::vector<NavigationEvent> lastEvents;
     std::string notice;
     bool showHelp = false;
 
@@ -135,18 +132,14 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
         }
         const auto result = environment.step(action);
         notice.clear();
-        for (const auto& event : result.events) {
-            recent.push_back(event);
-            while (recent.size() > kRecentEvents) recent.pop_front();
-        }
+        lastEvents = result.events;
     };
 
     auto document = ftxui::Renderer([&] {
         if (showHelp) return ui.help();
 
-        const std::vector<NavigationEvent> window(recent.begin(), recent.end());
         ftxui::Elements lines_;
-        lines_.push_back(ui.render(environment, window));
+        lines_.push_back(ui.render(environment, lastEvents));
         if (!notice.empty()) lines_.push_back(ui.notice(notice));
         return ftxui::vbox(std::move(lines_));
     });
@@ -201,8 +194,7 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
               << "Puntaje: " << final_.score << '\n';
 }
 
-}  // namespace
-
+}
 int main(int argc, char** argv) {
     const auto options = parseOptions(argc, argv);
     if (!options) return 1;

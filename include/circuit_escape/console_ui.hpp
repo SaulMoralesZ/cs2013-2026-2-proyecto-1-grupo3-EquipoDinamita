@@ -49,6 +49,8 @@ public:
     [[nodiscard]] ftxui::Element help() const;
     [[nodiscard]] ftxui::Element notice(const std::string& text) const;
 
+    [[nodiscard]] std::string lastEventText(std::span<const NavigationEvent> stepEvents) const;
+
     template<std::size_t Rows, std::size_t Columns>
     [[nodiscard]] ftxui::Element render(
         const NavigationEnvironment<Rows, Columns>& environment,
