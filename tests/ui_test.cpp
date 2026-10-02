@@ -118,6 +118,24 @@ void consumiblesUsadosSeVenLibres() {
     }
 }
 
+void escenariosRealesSeDibujanEn20x30() {
+    for (const char* ruta : {"assets/maps/scenario_01.txt", "assets/maps/scenario_02.txt"}) {
+        const auto escenario = parseScenario<20, 30>(readLines(ruta));
+        const NavigationEnvironment<20, 30> entorno(escenario.grid, escenario.start);
+        const std::vector<NavigationEvent> sinEventos;
+
+        for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
+            const ConsoleUI ui(modo);
+            auto documento = ui.render(entorno, sinEventos);
+            auto pantalla = ftxui::Screen::Create(ftxui::Dimension::Fit(documento));
+            ftxui::Render(pantalla, documento);
+            assert(pantalla.dimx() == 62);
+            assert(pantalla.dimy() == 23);
+        }
+    }
+}
+
+
 void tableroDe20x30Ocupa62Columnas() {
     std::vector<std::string> lineas(20, std::string(30, '.'));
     lineas[0][0] = '@';
@@ -148,5 +166,6 @@ int main() {
     consumiblesUsadosSeVenLibres();
     tableroDe20x30Ocupa62Columnas();
     soloElTecladoCuentaComoComando();
+    escenariosRealesSeDibujanEn20x30();
     return 0;
 }
