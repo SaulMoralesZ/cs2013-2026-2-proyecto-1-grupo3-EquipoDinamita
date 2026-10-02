@@ -218,15 +218,12 @@ int main(int argc, char** argv) {
         const std::size_t rows = lines.size();
         const std::size_t columns = lines.front().size();
 
-        if (rows == 20 && columns == 30) {
-            runGame<20, 30>(lines, *options);
-        } else if (rows == 10 && columns == 20) {
-            runGame<10, 20>(lines, *options);
-        } else {
-            std::cerr << "Dimensiones no soportadas: " << rows << "x" << columns
-                      << ". El escenario de demostracion es 20x30.\n";
+        if (rows != 20 || columns != 30) {
+            std::cerr << "El escenario debe ser de 20x30 y tiene " << rows << "x" << columns
+                      << ": " << options->scenario << '\n';
             return 1;
         }
+        runGame<20, 30>(lines, *options);
     } catch (const std::exception& error) {
         std::cerr << "ERROR: " << error.what() << '\n';
         return 1;
