@@ -14,7 +14,6 @@ using namespace circuit_escape;
 
 namespace {
 
-// Devuelve true si el evento se traduce exactamente a esa acción.
 bool traduceA(const ConsoleUI& ui, const ftxui::Event& event, Action esperada) {
     const auto comando = ui.translate(event);
     if (!comando) return false;
@@ -55,7 +54,7 @@ void comandoDesconocidoSeRechaza() {
     const ConsoleUI ui;
     assert(!ui.translate(ftxui::Event::Character("x")));
     assert(!ui.translate(ftxui::Event::Character("1")));
-    assert(!ui.translate(ftxui::Event::Character("wa")));  // más de un carácter
+    assert(!ui.translate(ftxui::Event::Character("wa")));
     assert(!ui.translate(ftxui::Event::Tab));
 }
 
@@ -74,8 +73,8 @@ void glifosDistintosEnAmbosModos() {
             assert(!glifo.empty());
             vistos.insert(glifo);
         }
-        assert(vistos.size() == 7);                    // cada celda se distingue
-        assert(vistos.count(ui.agentGlyph()) == 0);    // el agente también
+        assert(vistos.size() == 7);
+        assert(vistos.count(ui.agentGlyph()) == 0);
     }
 }
 
@@ -112,20 +111,67 @@ void tableroDe20x30Ocupa62Columnas() {
         auto documento = ui.render(entorno, sinEventos);
         auto pantalla = ftxui::Screen::Create(ftxui::Dimension::Fit(documento));
         ftxui::Render(pantalla, documento);
-        // 1 columna de coordenadas + 30 celdas, todas de ancho 2.
         assert(pantalla.dimx() == 62);
-        // barra de estado + regla superior + 20 filas + pie.
         assert(pantalla.dimy() == 23);
     }
 }
 
-}  // namespace
+void pieResumeCadaTipoDeEvento() {
+    const ConsoleUI ui(RenderMode::ascii);
+    const auto texto = [&](std::vector<NavigationEvent> eventos) {
+        return ui.lastEventText(eventos);
+    };
+
+    assert(texto({}) == "sin eventos");
+    // movimiento normal
+    assert(texto({MovedEvent{{1, 1}, {1, 2}, 1}, EnergyChangedEvent{60, 59}}) == "@ en (1,2)");
+    // recurso
+    assert(texto({MovedEvent{{10, 23}, {10, 24}, 1}, EnergyChangedEvent{60, 59},
+                  ResourceCollectedEvent{{10, 24}, 10}}) == "R +10 en (10,24)");
+    // batería: primero se paga la entrada, luego se recarga
+    assert(texto({MovedEvent{{1, 1}, {1, 2}, 1}, EnergyChangedEvent{50, 49},
+                  EnergyChangedEvent{49, 52}}) == "B +3 energia");
+    // trampa
+    assert(texto({MovedEvent{{4, 3}, {4, 4}, 1}, EnergyChangedEvent{60, 59},
+                  TrapTriggeredEvent{{4, 4}}, EnergyChangedEvent{59, 57}}) == "T trampa en (4,4)");
+    // intento inválido
+    assert(texto({MovementRejectedEvent{{1, 1}, Action::up}, EnergyChangedEvent{60, 59}}) ==
+           "movimiento bloqueado hacia arriba");
+    // esperar
+    assert(texto({EnergyChangedEvent{60, 59}}) == "energia 60 -> 59");
+    // salida
+    assert(texto({MovedEvent{{18, 27}, {18, 28}, 1}, EnergyChangedEvent{5, 4},
+                  GoalReachedEvent{{18, 28}}}) == "S salida alcanzada en (18,28)");
+}
+
+void pieEnModoEmojiUsaElGlifoDeLaCelda() {
+    const ConsoleUI ui(RenderMode::emoji);
+    const std::vector<NavigationEvent> recurso{ResourceCollectedEvent{{10, 24}, 10}};
+    assert(ui.lastEventText(recurso) == ui.glyphFor(Cell{ResourceCell<int>{}}) + " +10 en (10,24)");
+}
+
+void pieConEventosRealesDelEntorno() {
+    std::vector<std::string> lineas(20, std::string(30, '.'));
+    lineas[0][0] = '@';
+    lineas[0][1] = 'R';
+    lineas[19][29] = 'S';
+    const auto escenario = parseScenario<20, 30>(lineas);
+    NavigationEnvironment<20, 30> entorno(escenario.grid, escenario.start);
+
+    const auto resultado = entorno.step(Action::right);
+    assert(ConsoleUI(RenderMode::ascii).lastEventText(resultado.events) == "R +10 en (0,1)");
+}
+
+}
 
 int main() {
     teclasDeMovimientoSinDistinguirMayusculas();
     flechas();
     ayudaYSalida();
     comandoDesconocidoSeRechaza();
+    pieResumeCadaTipoDeEvento();
+    pieEnModoEmojiUsaElGlifoDeLaCelda();
+    pieConEventosRealesDelEntorno();
     glifosDistintosEnAmbosModos();
     glifosAsciiExactos();
     consumiblesUsadosSeVenLibres();

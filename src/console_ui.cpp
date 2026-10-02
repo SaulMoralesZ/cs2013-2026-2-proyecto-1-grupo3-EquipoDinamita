@@ -1,5 +1,5 @@
 #include "../include/circuit_escape/console_ui.hpp"
-
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <variant>
@@ -37,7 +37,7 @@ std::optional<UiCommand> fromLetter(char letter) {
     }
 }
 
-}  // namespace
+}
 
 std::optional<RenderMode> parseRenderMode(std::string_view name) noexcept {
     if (name == "emoji") return RenderMode::emoji;
@@ -123,18 +123,84 @@ ftxui::Element ConsoleUI::horizontalRuler(std::size_t columns) const {
     return ftxui::hbox(std::move(labels));
 }
 
+namespace {
+
+std::string coordinates(Position position) {
+    return "(" + std::to_string(position.row) + "," + std::to_string(position.column) + ")";
+}
+
+std::string directionName(Action action) {
+    switch (action) {
+        case Action::up: return "arriba";
+        case Action::down: return "abajo";
+        case Action::left: return "izquierda";
+        case Action::right: return "derecha";
+        case Action::wait: return "esperar";
+    }
+    return "?";
+}
+
+int relevance(const NavigationEvent& event) {
+    return std::visit(
+        Overloaded{
+            [](const GoalReachedEvent&) { return 6; },
+            [](const TrapTriggeredEvent&) { return 5; },
+            [](const ResourceCollectedEvent&) { return 4; },
+            [](const EnergyChangedEvent& e) { return e.current > e.previous ? 3 : 0; },
+            [](const MovementRejectedEvent&) { return 2; },
+            [](const MovedEvent&) { return 1; }},
+        event);
+}
+
+}
+
+std::string ConsoleUI::lastEventText(std::span<const NavigationEvent> stepEvents) const {
+    if (stepEvents.empty()) return "sin eventos";
+
+    const auto headline = std::max_element(
+        stepEvents.begin(), stepEvents.end(),
+        [](const NavigationEvent& a, const NavigationEvent& b) {
+            return relevance(a) < relevance(b);
+        });
+
+    return std::visit(
+        Overloaded{
+            [&](const GoalReachedEvent& e) {
+                return glyphFor(Cell{Exit{}}) + " salida alcanzada en " + coordinates(e.at);
+            },
+            [&](const TrapTriggeredEvent& e) {
+                return glyphFor(Cell{Trap{}}) + " trampa en " + coordinates(e.at);
+            },
+            [&](const ResourceCollectedEvent& e) {
+                return glyphFor(Cell{ResourceCell<int>{}}) + " +" + std::to_string(e.points) +
+                       " en " + coordinates(e.at);
+            },
+            [&](const EnergyChangedEvent& e) {
+                if (e.current > e.previous) {
+                    return glyphFor(Cell{Battery{}}) + " +" +
+                           std::to_string(e.current - e.previous) + " energia";
+                }
+                return "energia " + std::to_string(e.previous) + " -> " +
+                       std::to_string(e.current);
+            },
+            [&](const MovementRejectedEvent& e) {
+                return "movimiento bloqueado hacia " + directionName(e.action);
+            },
+            [&](const MovedEvent& e) { return agentGlyph() + " en " + coordinates(e.to); }},
+        *headline);
+}
+
 ftxui::Element ConsoleUI::footer(std::span<const NavigationEvent> recentEvents,
                                  EndReason reason) const {
-    std::string left;
+    const std::string separator = mode_ == RenderMode::ascii ? " - " : " \xC2\xB7 ";
+    std::string shortHelp;
     if (reason != EndReason::none) {
-        left = toString(reason);
-    } else if (!recentEvents.empty()) {
-        left = describe(recentEvents.back());
+        shortHelp = "Fin: " + toString(reason) + separator + "Q salir";
     } else {
-        left = "sin eventos";
+        shortHelp = "WASD mover" + separator + "E esperar" + separator + "H ayuda" +
+                    separator + "Q salir";
     }
-    return ftxui::text(left + " | WASD mover - E esperar - H ayuda - Q salir") |
-           ftxui::dim;
+    return ftxui::text(lastEventText(recentEvents) + " | " + shortHelp) | ftxui::dim;
 }
 
 ftxui::Element ConsoleUI::notice(const std::string& text) const {
@@ -168,4 +234,4 @@ ftxui::Element ConsoleUI::help() const {
            ftxui::border;
 }
 
-}  // namespace circuit_escape
+}
