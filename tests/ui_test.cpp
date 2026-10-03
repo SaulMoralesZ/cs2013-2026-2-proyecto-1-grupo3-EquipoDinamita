@@ -8,7 +8,7 @@
 
 #include <ftxui/screen/screen.hpp>
 
-#include "circuit_escape/console_ui.hpp"
+#include "../include/circuit_escape/console_ui.hpp"
 
 using namespace circuit_escape;
 
@@ -67,7 +67,7 @@ void soloElTecladoCuentaComoComando() {
 
     ftxui::Mouse movimiento;
     movimiento.button = ftxui::Mouse::None;
-    movimiento.motion = ftxui::Mouse::Moved;
+    movimiento.motion = ftxui::Mouse::Pressed;
     assert(!ConsoleUI::isKeyboardEvent(ftxui::Event::Mouse("", movimiento)));
 
     ftxui::Mouse rueda;

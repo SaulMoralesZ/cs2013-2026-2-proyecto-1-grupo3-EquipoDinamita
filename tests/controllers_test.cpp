@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "circuit_escape/controllers.hpp"
+#include "../include/circuit_escape/controllers.hpp"
 
 using namespace circuit_escape;
 

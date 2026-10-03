@@ -4,7 +4,7 @@
 #include <variant>
 #include <vector>
 
-#include "circuit_escape/environment.hpp"
+#include "../include/circuit_escape/environment.hpp"
 
 using namespace circuit_escape;
 

@@ -53,6 +53,7 @@ if(CIRCUIT_ESCAPE_WITH_UI)
     FetchContent_Declare(ftxui
             GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI
             GIT_TAG v7.0.3
+            FIND_PACKAGE_ARGS 7.0.3
     )
     FetchContent_MakeAvailable(ftxui)
 
