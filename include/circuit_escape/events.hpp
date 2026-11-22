@@ -5,6 +5,8 @@
 #include <variant>
 #include <vector>
 
+#include "cells.hpp"
+#include "grid.hpp"
 #include "position.hpp"
 
 namespace circuit_escape {
@@ -20,6 +22,10 @@ struct Observation {
     std::size_t collectedResources{};
     std::size_t turn{};
     std::vector<Action> availableActions;
+    const Grid<Cell>* map{nullptr};
+    bool switch_a_active{false};
+    bool switch_b_active{false};
+    Position guard{};
 };
 
 struct MovedEvent {
