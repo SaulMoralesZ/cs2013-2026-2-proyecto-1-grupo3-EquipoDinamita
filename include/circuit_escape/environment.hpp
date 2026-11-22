@@ -45,27 +45,28 @@ template<typename... Checks>
 }
 
 // --------------------------------------------------------- Escenario
-template<std::size_t Rows, std::size_t Columns>
 struct Scenario {
-    Grid<Cell, Rows, Columns> grid{};
+    Grid<Cell> grid;
     Position start{};
 };
 
-template<std::size_t Rows, std::size_t Columns>
-[[nodiscard]] Scenario<Rows, Columns> parseScenario(std::span<const std::string> lines) {
-    if (lines.size() != Rows) {
-        throw std::invalid_argument("Escenario: se esperaban " + std::to_string(Rows) +
-                                    " filas y hay " + std::to_string(lines.size()));
+[[nodiscard]]inline Scenario parseScenario(std::span<const std::string> lines) {
+    if (lines.empty()) {
+        throw std::invalid_argument("Escenario: no tiene filas");
     }
-    Scenario<Rows, Columns> scenario{};
+
+    const std::size_t rows = lines.size();
+    const std::size_t columns = lines.front().size();
+
+    Scenario scenario{Grid<Cell>(rows, columns), Position{}};
     std::optional<Position> start;
-    for (std::size_t r = 0; r < Rows; ++r) {
-        if (lines[r].size() != Columns) {
+    for (std::size_t r = 0; r < rows; ++r) {
+        if (lines[r].size() != columns) {
             throw std::invalid_argument("Escenario: la fila " + std::to_string(r) +
-                                        " debe tener " + std::to_string(Columns) +
+                                        " debe tener " + std::to_string(columns) +
                                         " columnas");
         }
-        for (std::size_t c = 0; c < Columns; ++c) {
+        for (std::size_t c = 0; c < columns; ++c) {
             const auto cell = cellFromChar(lines[r][c]);
             if (!cell) {
                 throw std::invalid_argument(std::string("Escenario: simbolo desconocido '") +
@@ -84,12 +85,11 @@ template<std::size_t Rows, std::size_t Columns>
 }
 
 // ----------------------------------------------------------- Entorno
-template<std::size_t Rows, std::size_t Columns>
 class NavigationEnvironment {
 public:
-    using grid_type = Grid<Cell, Rows, Columns>;
+    using grid_type = Grid<Cell>;
 
-    NavigationEnvironment(grid_type initialGrid, Position start,
+    NavigationEnvironment(Grid<Cell> initialGrid, Position start,
                           GameRules rules = rulesFor(Difficulty::standard))
         : initialGrid_(std::move(initialGrid)),
           grid_(initialGrid_),
