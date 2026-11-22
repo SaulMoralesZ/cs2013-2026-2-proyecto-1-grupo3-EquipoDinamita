@@ -79,6 +79,7 @@ set(CIRCUIT_ESCAPE_TESTS
         interactions_test
         controllers_test
         scenario_test
+        turn_test
 )
 
 foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)

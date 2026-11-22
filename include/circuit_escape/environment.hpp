@@ -56,8 +56,6 @@ template<typename... Checks>
         cell);
 }
 
-enum class SwitchId {a,b};
-
 
 // --------------------------------------------------------- Escenario
 //Escenario completo de una partida. La salida no es un campo: el motor la encuentra como la única celda Exit del Grid
@@ -119,6 +117,9 @@ class NavigationEnvironment {
         Position guard_start;
     };
 
+    // Fase del turno en curso: obliga a llamar en el orden del PDF §3.2.
+    enum class TurnPhase { idle, player_done, guard_done };
+
 public:
     using grid_type = Grid<Cell>;
     explicit NavigationEnvironment(const Scenario& scenario)
@@ -175,6 +176,7 @@ public:
         guard_ = objectives_ ? objectives_->guard_start : Position{};
         switch_a_active_ = false;
         switch_b_active_ = false;
+        phase_ = TurnPhase::idle;
         energy_ = rules_.initialEnergy;
         score_ = 0;
         collected_ = 0;
@@ -201,8 +203,15 @@ public:
 
     [[nodiscard]] bool isFinished() const noexcept { return finished_; }
 
-    [[nodiscard]] StepResult step(Action action) {
-        if (finished_) throw std::logic_error("step: la partida ya termino");
+    // ---- Un turno completo (PDF §3.2) = estas tres llamadas, en este orden:
+    //      step_player -> (step_guard solo si guard_moves_this_turn()) -> finish_turn
+
+    // Pasos 1 y 2: el jugador actúa y se comprueba la captura inicial.
+    [[nodiscard]] StepResult step_player(Action action) {
+        if (finished_) throw std::logic_error("step_player: la partida ya termino");
+        if (phase_ != TurnPhase::idle) {
+            throw std::logic_error("step_player: el turno anterior no se cerro con finish_turn");
+        }
 
         ++turn_;
         std::vector<NavigationEvent> events;
@@ -222,16 +231,117 @@ public:
             changeEnergy(-rules_.invalidCost, events);
         }
 
-        reason_ = firstEnd(
-            EndCheck{agent_ == goal_ && energy_ > 0, EndReason::goalReached},
-            EndCheck{energy_ <= 0, EndReason::noEnergy},
-            EndCheck{turn_ >= rules_.turnLimit, EndReason::turnLimit});
-        finished_ = reason_ != EndReason::none;
-        if (reason_ == EndReason::goalReached) {
-            publish(events, GoalReachedEvent{agent_});
+        // Captura inicial: el jugador entró a la casilla del vigilante.
+        if (objectives_ && agent_ == guard_) {
+            reason_ = EndReason::captured;
+            finished_ = true;
+            publish(events, CapturedEvent{agent_});
         }
 
+        phase_ = TurnPhase::player_done;
         return StepResult{state(), std::move(events), finished_, reason_};
+    }
+
+    // Paso 3: valida y aplica la acción del vigilante. No gasta energía del
+    // jugador y no recoge baterías ni recursos.
+    [[nodiscard]] StepResult step_guard(Action action) {
+        requireObjectives("step_guard");
+        if (finished_ || phase_ != TurnPhase::player_done) {
+            throw std::logic_error(
+                "step_guard: debe llamarse una sola vez, justo despues de step_player, "
+                "con la partida en curso");
+        }
+        if (!guard_moves_this_turn()) {
+            throw std::logic_error("step_guard: en turnos impares el vigilante no se mueve");
+        }
+        const auto legal = guard_legal_actions();
+        if (std::find(legal.begin(), legal.end(), action) == legal.end()) {
+            throw std::invalid_argument("step_guard: accion no permitida para el vigilante");
+        }
+
+        std::vector<NavigationEvent> events;
+        if (const auto destination = destinationFrom(guard_, action)) {
+            const Position from = guard_;
+            guard_ = *destination;
+            publish(events, GuardMovedEvent{from, guard_});
+        }
+        phase_ = TurnPhase::guard_done;
+        return StepResult{state(), std::move(events), finished_, reason_};
+    }
+
+    // Paso 4: comprobaciones finales y cierre del turno. Orden fijo:
+    // captura -> sin energia -> activar interruptor -> escape -> limite de turnos.
+    // Si el turno ya terminó (captura inicial) devuelve ese resultado.
+    [[nodiscard]] StepResult finish_turn() {
+        if (phase_ == TurnPhase::idle) {
+            throw std::logic_error("finish_turn: falta step_player");
+        }
+        std::vector<NavigationEvent> events;
+
+        if (!finished_) {
+            if (phase_ == TurnPhase::player_done && guard_moves_this_turn()) {
+                throw std::logic_error("finish_turn: en turno par falta step_guard");
+            }
+
+            const bool captured = objectives_ && agent_ == guard_;
+            reason_ = firstEnd(
+                EndCheck{captured, EndReason::captured},
+                EndCheck{energy_ <= 0, EndReason::noEnergy});
+
+            if (reason_ == EndReason::captured) {
+                publish(events, CapturedEvent{agent_});
+            } else if (reason_ == EndReason::none) {
+                activate_switch_at(agent_, events);
+                reason_ = firstEnd(
+                    EndCheck{agent_ == goal_ && bothSwitchesActive() && energy_ > 0,
+                             EndReason::goalReached},
+                    EndCheck{turn_ >= rules_.turnLimit, EndReason::turnLimit});
+            }
+
+            finished_ = reason_ != EndReason::none;
+            if (reason_ == EndReason::goalReached) {
+                publish(events, GoalReachedEvent{agent_});
+            }
+        }
+
+        phase_ = TurnPhase::idle;
+        return StepResult{state(), std::move(events), finished_, reason_};
+    }
+
+    // El vigilante se mueve en los turnos pares (los turnos se cuentan desde 1).
+    // Se evalúa después de step_player.
+    [[nodiscard]] bool guard_moves_this_turn() const noexcept {
+        return objectives_.has_value() && turn_ != 0 && turn_ % 2 == 0;
+    }
+
+    // Movimientos legales del vigilante: respetan muros y bordes; esperar siempre.
+    [[nodiscard]] std::vector<Action> guard_legal_actions() const {
+        std::vector<Action> actions;
+        if (!objectives_ || finished_) return actions;
+        for (Action action : {Action::up, Action::down, Action::left, Action::right}) {
+            if (destinationFrom(guard_, action)) actions.push_back(action);
+        }
+        actions.push_back(Action::wait);
+        return actions;
+    }
+
+    // HEREDADO del Proyecto 1: un turno de una sola llamada. Con vigilante,
+    // este siempre espera en sus turnos. Sirve a las pruebas heredadas y a main.
+    [[nodiscard]] StepResult step(Action action) {
+        StepResult player = step_player(action);
+        std::vector<NavigationEvent> events = std::move(player.events);
+        const auto append = [&events](StepResult& part) {
+            events.insert(events.end(), std::make_move_iterator(part.events.begin()),
+                          std::make_move_iterator(part.events.end()));
+        };
+        if (!finished_ && guard_moves_this_turn()) {
+            StepResult guard = step_guard(Action::wait);
+            append(guard);
+        }
+        StepResult last = finish_turn();
+        append(last);
+        return StepResult{std::move(last.observation), std::move(events), last.finished,
+                          last.reason};
     }
 
     // --- Lecturas de solo lectura (nombres nuevos en snake_case) ---
@@ -309,12 +419,33 @@ private:
         }
     }
 
-    // Posición destino si el movimiento es válido (dentro del tablero y transitable).
-    [[nodiscard]] std::optional<Position> target(Action action) const {
-        const auto candidate = neighbor(agent_, action);
+    // Posición destino desde `origin` si el movimiento es válido
+    // (dentro del tablero y transitable).
+    [[nodiscard]] std::optional<Position> destinationFrom(Position origin, Action action) const {
+        const auto candidate = neighbor(origin, action);
         if (!candidate || !grid_.contains(*candidate)) return std::nullopt;
         if (!isTraversable(grid_.at(*candidate))) return std::nullopt;
         return candidate;
+    }
+
+    [[nodiscard]] std::optional<Position> target(Action action) const {
+        return destinationFrom(agent_, action);
+    }
+
+    [[nodiscard]] bool bothSwitchesActive() const noexcept {
+        return !objectives_ || (switch_a_active_ && switch_b_active_);
+    }
+
+    // Único lugar donde se activan los interruptores (decisión 6 del contrato).
+    void activate_switch_at(Position position, std::vector<NavigationEvent>& events) {
+        if (!objectives_) return;
+        if (position == objectives_->switch_a && !switch_a_active_) {
+            switch_a_active_ = true;
+            publish(events, SwitchActivatedEvent{SwitchId::a, position});
+        } else if (position == objectives_->switch_b && !switch_b_active_) {
+            switch_b_active_ = true;
+            publish(events, SwitchActivatedEvent{SwitchId::b, position});
+        }
     }
 
     void changeEnergy(int delta, std::vector<NavigationEvent>& events) {
@@ -360,6 +491,7 @@ private:
     Position guard_{};
     bool switch_a_active_{false};
     bool switch_b_active_{false};
+    TurnPhase phase_{TurnPhase::idle};
     int energy_{0};
     int score_{0};
     std::size_t collected_{0};

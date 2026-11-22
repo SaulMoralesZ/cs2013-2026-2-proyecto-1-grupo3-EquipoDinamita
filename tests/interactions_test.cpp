@@ -131,6 +131,9 @@ void procesamientoDeCadaTipoDeEvento() {
         EnergyChangedEvent{10, 8},
         TrapTriggeredEvent{{0, 1}},
         GoalReachedEvent{{0, 2}},
+        GuardMovedEvent{{1, 1}, {1, 2}},
+        SwitchActivatedEvent{SwitchId::a, {1, 1}},
+        CapturedEvent{{1, 2}},
     };
 
     std::size_t visitados = 0;
@@ -142,6 +145,9 @@ void procesamientoDeCadaTipoDeEvento() {
                        [&](const EnergyChangedEvent&) { ++visitados; },
                        [&](const TrapTriggeredEvent&) { ++visitados; },
                        [&](const GoalReachedEvent&) { ++visitados; },
+                       [&](const GuardMovedEvent&) { ++visitados; },
+                       [&](const SwitchActivatedEvent&) { ++visitados; },
+                       [&](const CapturedEvent&) { ++visitados; },
                    },
                    evento);
         assert(!describe(evento).empty());

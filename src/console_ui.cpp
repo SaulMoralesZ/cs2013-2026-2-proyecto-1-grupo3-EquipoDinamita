@@ -148,12 +148,15 @@ std::string directionName(Action action) {
 int relevance(const NavigationEvent& event) {
     return std::visit(
         Overloaded{
-            [](const GoalReachedEvent&) { return 6; },
-            [](const TrapTriggeredEvent&) { return 5; },
-            [](const ResourceCollectedEvent&) { return 4; },
-            [](const EnergyChangedEvent& e) { return e.current > e.previous ? 3 : 0; },
-            [](const MovementRejectedEvent&) { return 2; },
-            [](const MovedEvent&) { return 1; }},
+    [](const CapturedEvent&) { return 8; },
+    [](const GoalReachedEvent&) { return 6; },
+    [](const SwitchActivatedEvent&) { return 7; },
+    [](const TrapTriggeredEvent&) { return 5; },
+    [](const ResourceCollectedEvent&) { return 4; },
+    [](const EnergyChangedEvent& e) { return e.current > e.previous ? 3 : 0; },
+    [](const MovementRejectedEvent&) { return 2; },
+    [](const MovedEvent&) { return 1; },
+    [](const GuardMovedEvent&) { return 1; }},
         event);
 }
 
@@ -191,7 +194,12 @@ std::string ConsoleUI::lastEventText(std::span<const NavigationEvent> stepEvents
             [&](const MovementRejectedEvent& e) {
                 return "movimiento bloqueado hacia " + directionName(e.action);
             },
-            [&](const MovedEvent& e) { return agentGlyph() + " en " + coordinates(e.to); }},
+            [&](const MovedEvent& e) { return agentGlyph() + " en " + coordinates(e.to); },
+            [&](const GuardMovedEvent& e) { return "vigilante en " + coordinates(e.to); },
+            [&](const SwitchActivatedEvent& e) {
+                return std::string("interruptor ") + (e.id == SwitchId::a ? "A" : "B") + " activado en " + coordinates(e.at);
+            },
+            [&](const CapturedEvent& e) { return "capturado en " + coordinates(e.at); }},
         *headline);
 }
 

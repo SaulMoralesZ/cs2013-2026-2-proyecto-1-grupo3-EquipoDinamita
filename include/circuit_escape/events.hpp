@@ -9,6 +9,8 @@
 
 namespace circuit_escape {
 
+enum class SwitchId {a,b};
+
 struct Observation {
     Position agent;
     Position goal;
@@ -49,20 +51,38 @@ struct GoalReachedEvent {
     Position at;
 };
 
+struct GuardMovedEvent {
+    Position from;
+    Position to;
+};
+
+struct SwitchActivatedEvent {
+    SwitchId id;
+    Position at;
+};
+
+struct CapturedEvent {
+    Position at;
+};
+
 using NavigationEvent = std::variant<
     MovedEvent,
     MovementRejectedEvent,
     ResourceCollectedEvent,
     EnergyChangedEvent,
     TrapTriggeredEvent,
-    GoalReachedEvent
+    GoalReachedEvent,
+    GuardMovedEvent,
+    SwitchActivatedEvent,
+    CapturedEvent
 >;
 
 enum class EndReason {
     none,
     goalReached,
     noEnergy,
-    turnLimit
+    turnLimit,
+    captured
 };
 
 struct StepResult {
