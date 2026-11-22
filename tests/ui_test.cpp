@@ -120,8 +120,8 @@ void consumiblesUsadosSeVenLibres() {
 
 void escenariosRealesSeDibujanEn20x30() {
     for (const char* ruta : {"assets/maps/scenario_01.txt", "assets/maps/scenario_02.txt"}) {
-        const auto escenario = parseScenario<20, 30>(readLines(ruta));
-        const NavigationEnvironment<20, 30> entorno(escenario.grid, escenario.start);
+        const auto escenario = parseScenario(readLines(ruta));
+        const NavigationEnvironment entorno(escenario.grid, escenario.start);
         const std::vector<NavigationEvent> sinEventos;
 
         for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
@@ -135,13 +135,12 @@ void escenariosRealesSeDibujanEn20x30() {
     }
 }
 
-
 void tableroDe20x30Ocupa62Columnas() {
     std::vector<std::string> lineas(20, std::string(30, '.'));
     lineas[0][0] = '@';
     lineas[19][29] = 'S';
-    const auto escenario = parseScenario<20, 30>(lineas);
-    const NavigationEnvironment<20, 30> entorno(escenario.grid, escenario.start);
+    const auto escenario = parseScenario(lineas);
+    const NavigationEnvironment entorno(escenario.grid, escenario.start);
     const std::vector<NavigationEvent> sinEventos;
 
     for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
@@ -193,8 +192,8 @@ void pieConEventosRealesDelEntorno() {
     lineas[0][0] = '@';
     lineas[0][1] = 'R';
     lineas[19][29] = 'S';
-    const auto escenario = parseScenario<20, 30>(lineas);
-    NavigationEnvironment<20, 30> entorno(escenario.grid, escenario.start);
+    const auto escenario = parseScenario(lineas);
+    NavigationEnvironment entorno(escenario.grid, escenario.start);
 
     const auto resultado = entorno.step(Action::right);
     assert(ConsoleUI(RenderMode::ascii).lastEventText(resultado.events) == "R +10 en (0,1)");

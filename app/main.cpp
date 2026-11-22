@@ -105,11 +105,9 @@ std::optional<Options> parseOptions(int argc, char** argv) {
     return options;
 }
 
-template<std::size_t Rows, std::size_t Columns>
 void runGame(const std::vector<std::string>& lines, const Options& options) {
-    const auto scenario = parseScenario<Rows, Columns>(lines);
-    NavigationEnvironment<Rows, Columns> environment(scenario.grid, scenario.start,
-                                                     rulesFor(options.difficulty));
+    const auto scenario = parseScenario(lines);
+    NavigationEnvironment environment(scenario.grid, scenario.start, rulesFor(options.difficulty));
     environment.reset(options.seed);
 
     ConsoleUI ui(options.renderMode);
@@ -206,20 +204,10 @@ int main(int argc, char** argv) {
             std::cerr << "El escenario esta vacio: " << options->scenario << '\n';
             return 1;
         }
-
-        const std::size_t rows = lines.size();
-        const std::size_t columns = lines.front().size();
-
-        if (rows != 20 || columns != 30) {
-            std::cerr << "El escenario debe ser de 20x30 y tiene " << rows << "x" << columns
-                      << ": " << options->scenario << '\n';
-            return 1;
-        }
-        runGame<20, 30>(lines, *options);
+        runGame(lines, *options);
     } catch (const std::exception& error) {
         std::cerr << "ERROR: " << error.what() << '\n';
         return 1;
     }
-
     return 0;
 }

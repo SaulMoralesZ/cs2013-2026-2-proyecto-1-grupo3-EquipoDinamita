@@ -51,25 +51,24 @@ public:
 
     [[nodiscard]] std::string lastEventText(std::span<const NavigationEvent> stepEvents) const;
 
-    template<std::size_t Rows, std::size_t Columns>
     [[nodiscard]] ftxui::Element render(
-        const NavigationEnvironment<Rows, Columns>& environment,
+        const NavigationEnvironment& environment,
         std::span<const NavigationEvent> recentEvents) const {
         const Observation state = environment.state();
+        const std::size_t rows = environment.grid().rows();
+        const std::size_t columns = environment.grid().columns();
 
         ftxui::Elements lines;
         lines.push_back(statusBar(state, environment.totalResources(),
                                   environment.rules().turnLimit));
-        lines.push_back(horizontalRuler(Columns));
+        lines.push_back(horizontalRuler(columns));
 
-        for (std::size_t row = 0; row < Rows; ++row) {
+        for (std::size_t row = 0; row < rows; ++row) {
             ftxui::Elements cells;
             cells.push_back(cellBox(coordinateLabel(row)));
-            for (std::size_t column = 0; column < Columns; ++column) {
+            for (std::size_t column = 0; column < columns; ++column) {
                 const Position position{row, column};
-                cells.push_back(cellBox(position == state.agent
-                                            ? agentGlyph()
-                                            : glyphFor(environment.grid().at(position))));
+                cells.push_back(cellBox(position == state.agent ? agentGlyph() : glyphFor(environment.grid().at(position))));
             }
             lines.push_back(ftxui::hbox(std::move(cells)));
         }

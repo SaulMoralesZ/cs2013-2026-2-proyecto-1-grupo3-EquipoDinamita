@@ -26,16 +26,12 @@ char cellSymbol(const Cell& cell) {
 int main() {
 
     try {
-        constexpr std::size_t Rows = 10;
-        constexpr std::size_t Columns = 20;
-
         const auto lines =
             readLines("assets/maps/scenario_01.txt");
 
-        const auto scenario =
-            parseScenario<Rows, Columns>(lines);
+        const auto scenario = parseScenario(lines);
 
-        NavigationEnvironment<Rows, Columns> game(
+        NavigationEnvironment game(
             scenario.grid,
             scenario.start
         );
