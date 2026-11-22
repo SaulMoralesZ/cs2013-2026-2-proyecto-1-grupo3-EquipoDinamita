@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstddef>
 #include <set>
+#include <utility>
 #include <string>
 #include <variant>
 #include <vector>
@@ -135,6 +136,7 @@ void escenariosRealesSeDibujanEn20x30() {
     }
 }
 
+
 void tableroDe20x30Ocupa62Columnas() {
     std::vector<std::string> lineas(20, std::string(30, '.'));
     lineas[0][0] = '@';
@@ -150,6 +152,28 @@ void tableroDe20x30Ocupa62Columnas() {
         ftxui::Render(pantalla, documento);
         assert(pantalla.dimx() == 62);
         assert(pantalla.dimy() == 23);
+    }
+}
+
+void tableroDeCualquierTamanoConservaFilasYColumnas() {
+    for (const auto& [filas, columnas] : {std::pair<std::size_t, std::size_t>{10, 15},
+                                          {20, 30}, {40, 60}, {3, 4}}) {
+        std::vector<std::string> lineas(filas, std::string(columnas, '.'));
+        lineas[0][0] = '@';
+        lineas[filas - 1][columnas - 1] = 'S';
+        const auto escenario = parseScenario(lineas);
+        const NavigationEnvironment entorno(escenario.grid, escenario.start);
+        const std::vector<NavigationEvent> sinEventos;
+
+        for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
+            const ConsoleUI ui(modo);
+            // Tamaño natural del elemento: no depende del tamaño de la terminal
+            // (Dimension::Fit recorta a la terminal y 40x60 no cabe en 80x24).
+            auto documento = ui.render(entorno, sinEventos);
+            documento->ComputeRequirement();
+            assert(documento->requirement().min_x >= static_cast<int>(2 * (columnas + 1)));
+            assert(documento->requirement().min_y == static_cast<int>(filas + 3));
+        }
     }
 }
 
@@ -213,6 +237,7 @@ int main() {
     glifosAsciiExactos();
     consumiblesUsadosSeVenLibres();
     tableroDe20x30Ocupa62Columnas();
+    tableroDeCualquierTamanoConservaFilasYColumnas();
     soloElTecladoCuentaComoComando();
     escenariosRealesSeDibujanEn20x30();
     return 0;

@@ -55,24 +55,21 @@ public:
         const NavigationEnvironment& environment,
         std::span<const NavigationEvent> recentEvents) const {
         const Observation state = environment.state();
-        const std::size_t rows = environment.grid().rows();
-        const std::size_t columns = environment.grid().columns();
+        const auto& grid = environment.grid();
 
         ftxui::Elements lines;
-        lines.push_back(statusBar(state, environment.totalResources(),
-                                  environment.rules().turnLimit));
-        lines.push_back(horizontalRuler(columns));
+        lines.push_back(statusBar(state, environment.totalResources(), environment.rules().turnLimit));
+        lines.push_back(horizontalRuler(grid.columns()));
 
-        for (std::size_t row = 0; row < rows; ++row) {
+        for (std::size_t row = 0; row < grid.rows(); ++row) {
             ftxui::Elements cells;
             cells.push_back(cellBox(coordinateLabel(row)));
-            for (std::size_t column = 0; column < columns; ++column) {
+            for (std::size_t column = 0; column < grid.columns(); ++column) {
                 const Position position{row, column};
-                cells.push_back(cellBox(position == state.agent ? agentGlyph() : glyphFor(environment.grid().at(position))));
+                cells.push_back(cellBox(position == state.agent ? agentGlyph() : glyphFor(grid.at(position))));
             }
             lines.push_back(ftxui::hbox(std::move(cells)));
         }
-
         lines.push_back(footer(recentEvents, environment.endReason()));
         return ftxui::vbox(std::move(lines));
     }
