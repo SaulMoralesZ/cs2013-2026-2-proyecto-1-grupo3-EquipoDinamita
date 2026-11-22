@@ -78,6 +78,7 @@ set(CIRCUIT_ESCAPE_TESTS
         environment_test
         interactions_test
         controllers_test
+        scenario_test
 )
 
 foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)
@@ -88,6 +89,11 @@ foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)
              COMMAND ${test_name}
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
+
+# Programa de demostración del entorno (no es un test de CTest)
+add_executable(demo_environment tests/test1-1.cpp)
+target_link_libraries(demo_environment PRIVATE circuit_escape)
+circuit_escape_configure(demo_environment)
 
 # Prueba de la interfaz
 if(CIRCUIT_ESCAPE_WITH_UI)

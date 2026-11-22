@@ -44,13 +44,39 @@ template<typename... Checks>
     return result;
 }
 
+// ------------------------------------------------------ Costo de entrada
+// Costo de energía de entrar a una celda. Lo usan el motor, Dijkstra y la
+// ayuda H, para que preparación, ayuda y juego coincidan. Solo cuentan la
+// casilla base y la áspera; las recargas no son pesos negativos.
+[[nodiscard]] inline int entry_cost(const Cell& cell, const GameRules& rules) {
+    return std::visit(
+        Overloaded{
+            [&](const RoughTerrain&) { return rules.roughCost; },
+            [&](const auto&) { return rules.baseCost; }},
+        cell);
+}
+
+enum class SwitchId {a,b};
+
+
 // --------------------------------------------------------- Escenario
+//Escenario completo de una partida. La salida no es un campo: el motor la encuentra como la única celda Exit del Grid
 struct Scenario {
+    Grid<Cell> grid;
+    Position start{};
+    Position switch_a{};
+    Position switch_b{};
+    Position guard_start{};
+    GameRules rules{};
+};
+
+// Lo que describe un archivo de texto del Proyecto 1: tablero y posición inicial ('@'), sin interruptores ni vigilante
+struct BoardLayout {
     Grid<Cell> grid;
     Position start{};
 };
 
-[[nodiscard]]inline Scenario parseScenario(std::span<const std::string> lines) {
+[[nodiscard]]inline BoardLayout parseScenario(std::span<const std::string> lines) {
     if (lines.empty()) {
         throw std::invalid_argument("Escenario: no tiene filas");
     }
@@ -58,7 +84,7 @@ struct Scenario {
     const std::size_t rows = lines.size();
     const std::size_t columns = lines.front().size();
 
-    Scenario scenario{Grid<Cell>(rows, columns), Position{}};
+    BoardLayout scenario{Grid<Cell>(rows, columns), Position{}};
     std::optional<Position> start;
     for (std::size_t r = 0; r < rows; ++r) {
         if (lines[r].size() != columns) {
@@ -86,19 +112,35 @@ struct Scenario {
 
 // ----------------------------------------------------------- Entorno
 class NavigationEnvironment {
+    // Posiciones de los objetivos de la partida (interruptores y vigilante)
+    struct Objectives {
+        Position switch_a;
+        Position switch_b;
+        Position guard_start;
+    };
+
 public:
     using grid_type = Grid<Cell>;
-
+    explicit NavigationEnvironment(const Scenario& scenario)
+        : NavigationEnvironment(scenario.grid, scenario.start, scenario.rules,
+                                Objectives{scenario.switch_a, scenario.switch_b,
+                                scenario.guard_start}) {}
     NavigationEnvironment(Grid<Cell> initialGrid, Position start,
                           GameRules rules = rulesFor(Difficulty::standard))
+        : NavigationEnvironment(std::move(initialGrid), start, rules, std::nullopt) {}
+
+private:
+    NavigationEnvironment(Grid<Cell> initialGrid, Position start, GameRules rules,
+                          std::optional<Objectives> objectives)
         : initialGrid_(std::move(initialGrid)),
           grid_(initialGrid_),
           start_(start),
-          rules_(rules) {
+          rules_(rules),
+          objectives_(objectives) {
         if (rules_.initialEnergy <= 0 || rules_.maximumEnergy < rules_.initialEnergy ||
             rules_.turnLimit == 0) {
             throw std::invalid_argument("Reglas invalidas: energia o limite de turnos");
-        }
+            }
         if (!initialGrid_.contains(start_)) {
             throw std::invalid_argument("La posicion inicial esta fuera del tablero");
         }
@@ -110,6 +152,7 @@ public:
             throw std::invalid_argument("El tablero debe tener exactamente una salida");
         }
         goal_ = *findPosition(initialGrid_, isExit);
+        if (objectives_) validateObjectives(*objectives_);
 
         // La recompensa configurada se estampa en cada recurso del mapa.
         std::for_each(initialGrid_.begin(), initialGrid_.end(), [&](Cell& cell) {
@@ -123,11 +166,15 @@ public:
         reset(0);
     }
 
+public:
     // Restaura la partida inicial. La semilla se conserva para los
     // controladores / experimentos (el entorno es determinista).
     void reset(std::uint32_t seed) {
         grid_ = initialGrid_;
         agent_ = start_;
+        guard_ = objectives_ ? objectives_->guard_start : Position{};
+        switch_a_active_ = false;
+        switch_b_active_ = false;
         energy_ = rules_.initialEnergy;
         score_ = 0;
         collected_ = 0;
@@ -166,7 +213,7 @@ public:
             const Position from = agent_;
             agent_ = *destination;
             Cell& cell = grid_.at(agent_);
-            const int cost = entryCost(cell);
+            const int cost = entry_cost(cell, rules_);
             publish(events, MovedEvent{from, agent_, cost});
             changeEnergy(-cost, events);
             interact(cell, events);
@@ -187,6 +234,26 @@ public:
         return StepResult{state(), std::move(events), finished_, reason_};
     }
 
+    // --- Lecturas de solo lectura (nombres nuevos en snake_case) ---
+    [[nodiscard]] bool has_objectives() const noexcept { return objectives_.has_value(); }
+    [[nodiscard]] Position player_position() const noexcept { return agent_; }
+    [[nodiscard]] int energy() const noexcept { return energy_; }
+    // Turnos ya iniciados (0 tras reset; step_player lo incrementa al empezar).
+    [[nodiscard]] std::size_t turn() const noexcept { return turn_; }
+
+    [[nodiscard]] Position guard_position() const {
+        requireObjectives("guard_position");
+        return guard_;
+    }
+    [[nodiscard]] Position switch_position(SwitchId id) const {
+        requireObjectives("switch_position");
+        return id == SwitchId::a ? objectives_->switch_a : objectives_->switch_b;
+    }
+    [[nodiscard]] bool is_switch_active(SwitchId id) const {
+        requireObjectives("is_switch_active");
+        return id == SwitchId::a ? switch_a_active_ : switch_b_active_;
+    }
+
     [[nodiscard]] const grid_type& grid() const noexcept { return grid_; }
     [[nodiscard]] const GameRules& rules() const noexcept { return rules_; }
     [[nodiscard]] Position start() const noexcept { return start_; }
@@ -200,20 +267,54 @@ public:
     }
 
 private:
+    void requireObjectives(const char* caller) const {
+        if (!objectives_) {
+            throw std::logic_error(std::string(caller) +
+                                   ": la partida no tiene interruptores ni vigilante");
+        }
+    }
+
+    // Inicio, A, B y vigilante: dentro del tablero, sobre celda libre o de
+    // terreno aspero (no Wall ni Exit) y distintos entre si.
+    void validateObjectives(const Objectives& objectives) const {
+        struct Named {
+            Position position;
+            const char* name;
+        };
+        const Named named[] = {{start_, "El inicio"},
+                               {objectives.switch_a, "El interruptor A"},
+                               {objectives.switch_b, "El interruptor B"},
+                               {objectives.guard_start, "El vigilante"}};
+        for (const auto& item : named) {
+            if (!initialGrid_.contains(item.position)) {
+                throw std::invalid_argument(std::string(item.name) +
+                                            " esta fuera del tablero");
+            }
+            const Cell& cell = initialGrid_.at(item.position);
+            if (!std::holds_alternative<Empty>(cell) &&
+                !std::holds_alternative<RoughTerrain>(cell)) {
+                throw std::invalid_argument(
+                    std::string(item.name) +
+                    " debe estar sobre una celda libre o de terreno aspero");
+                }
+        }
+        for (std::size_t i = 0; i < std::size(named); ++i) {
+            for (std::size_t j = i + 1; j < std::size(named); ++j) {
+                if (named[i].position == named[j].position) {
+                    throw std::invalid_argument(std::string(named[i].name) + " y " +
+                                                named[j].name +
+                                                " no pueden compartir casilla");
+                }
+            }
+        }
+    }
+
     // Posición destino si el movimiento es válido (dentro del tablero y transitable).
     [[nodiscard]] std::optional<Position> target(Action action) const {
         const auto candidate = neighbor(agent_, action);
         if (!candidate || !grid_.contains(*candidate)) return std::nullopt;
         if (!isTraversable(grid_.at(*candidate))) return std::nullopt;
         return candidate;
-    }
-
-    [[nodiscard]] int entryCost(const Cell& cell) const {
-        return std::visit(
-            Overloaded{
-                [&](const RoughTerrain&) { return rules_.roughCost; },
-                [&](const auto&) { return rules_.baseCost; }},
-            cell);
     }
 
     void changeEnergy(int delta, std::vector<NavigationEvent>& events) {
@@ -253,8 +354,12 @@ private:
     Position start_;
     Position goal_{};
     GameRules rules_;
+    std::optional<Objectives> objectives_;
 
     Position agent_{};
+    Position guard_{};
+    bool switch_a_active_{false};
+    bool switch_b_active_{false};
     int energy_{0};
     int score_{0};
     std::size_t collected_{0};
