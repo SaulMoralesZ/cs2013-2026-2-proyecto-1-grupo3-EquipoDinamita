@@ -58,7 +58,9 @@ public:
     }
 
     [[nodiscard]] std::optional<Position> neighbor(Position origin, Action action) const {
-        return std::nullopt;
+        const auto candidate = circuit_escape::neighbor(origin, action);
+        if (!candidate || !contains(*candidate)) return std::nullopt;
+        return candidate;
     }
     iterator begin() noexcept { return cells_.begin(); }
     iterator end() noexcept { return cells_.end(); }
