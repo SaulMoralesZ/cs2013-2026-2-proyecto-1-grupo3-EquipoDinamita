@@ -27,8 +27,8 @@ public:
 
     Grid(std::size_t rows, std::size_t columns) : rows_(rows), columns_(columns), cells_(checked_size(rows,columns)) {}
 
-    std::size_t rows() const noexcept { return rows_; };
-    std::size_t columns() const noexcept { return columns_; };
+    std::size_t rows() const noexcept { return rows_; }
+    std::size_t columns() const noexcept { return columns_; }
 
     [[nodiscard]] bool contains(Position position) const noexcept {
         return position.row < rows_ && position.column < columns_;
