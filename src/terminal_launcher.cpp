@@ -23,10 +23,12 @@ namespace circuit_escape {
 namespace fs = std::filesystem;
 
 bool running_in_terminal() {
+    // Basta con que una este conectada: "juego --help | less" o redirigir la
+    // salida a un archivo no deben abrir otra ventana. Con doble clic, ninguna lo esta.
 #if defined(_WIN32)
-    return _isatty(_fileno(stdin)) && _isatty(_fileno(stdout));
+    return _isatty(_fileno(stdin)) || _isatty(_fileno(stdout)) || _isatty(_fileno(stderr));
 #else
-    return isatty(STDIN_FILENO) && isatty(STDOUT_FILENO);
+    return isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) || isatty(STDERR_FILENO);
 #endif
 }
 

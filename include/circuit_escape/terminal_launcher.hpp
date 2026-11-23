@@ -16,7 +16,8 @@ namespace circuit_escape {
 // Opcion interna con la que el juego se relanza a si mismo en la terminal.
 inline constexpr const char* kLaunchedFlag = "--launched";
 
-// true si la entrada y la salida estandar son una terminal.
+// true si la entrada, la salida o la salida de errores es una terminal.
+// Solo con doble clic (ninguna conectada) conviene abrir una terminal nueva.
 [[nodiscard]] bool running_in_terminal();
 
 // Una forma concreta de abrir `command` dentro de un emulador de terminal.

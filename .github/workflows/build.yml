@@ -16,7 +16,7 @@ jobs:
     name: Windows (MSVC)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: NSIS (para el instalador)
         shell: pwsh
@@ -39,7 +39,7 @@ jobs:
         working-directory: build
         run: cpack -C Release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: escape-circuit-windows
           path: |
@@ -51,7 +51,7 @@ jobs:
     name: Linux (GCC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configurar (Release, estatico)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCIRCUIT_ESCAPE_STATIC=ON
@@ -66,7 +66,7 @@ jobs:
         working-directory: build
         run: cpack
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: escape-circuit-linux
           path: |

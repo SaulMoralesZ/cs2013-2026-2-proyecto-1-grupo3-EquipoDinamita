@@ -43,7 +43,7 @@ void printUsage() {
               << "  (sin opciones)               menu: jugar, partidas guardadas, solucion, reglas\n"
               << "  --maps-dir <carpeta>         lote de niveles (por defecto: mapas incluidos)\n"
               << "  --saves-dir <carpeta>        partidas guardadas (por defecto: carpeta del usuario)\n"
-              << "  --level facil|medio|dificil  juega assets/maps/mapa_<nivel>.txt\n"
+              << "  --level facil|medio|dificil  juega ese nivel del lote (mapa_<nivel>.txt)\n"
               << "  --map <ruta>                 escenario generado (interruptores A/B y vigilante)\n"
               << "  --scenario <ruta>            mapa del Proyecto 1 (sin interruptores)\n"
               << "  --difficulty easy|standard|hard\n"
@@ -170,7 +170,9 @@ int main(int argc, char** argv) {
     // Doble clic (sin terminal): el juego se vuelve a abrir en su propia terminal.
     const bool hasLaunchedFlag =
         std::find(args.begin(), args.end(), std::string(kLaunchedFlag)) != args.end();
-    if (!running_in_terminal() && !hasLaunchedFlag) {
+    const bool wantsHelp = std::find(args.begin(), args.end(), std::string("--help")) != args.end() ||
+                           std::find(args.begin(), args.end(), std::string("-h")) != args.end();
+    if (!running_in_terminal() && !hasLaunchedFlag && !wantsHelp) {
         relaunch_in_terminal(args);  // solo vuelve si no hay ninguna terminal
         std::cerr << "No se encontro una terminal para abrir el juego. Ejecute escape_circuit "
                      "desde una terminal.\n";
