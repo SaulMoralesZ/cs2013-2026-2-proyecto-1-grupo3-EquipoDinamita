@@ -39,12 +39,10 @@ int main() {
         // scenario_1 es de 10x20 por las posiciones
         // . Si el archivo tiene otra dimension, cambia
         // estos dos valores:
-        constexpr std::size_t Rows = 10;
-        constexpr std::size_t Columns = 20;
 
-        const auto scenario = parseScenario<Rows, Columns>(lines);
+        const auto scenario = parseScenario(lines);
 
-        NavigationEnvironment<Rows, Columns> environment(
+        NavigationEnvironment environment(
             scenario.grid,
             scenario.start,
             rulesFor(Difficulty::standard));

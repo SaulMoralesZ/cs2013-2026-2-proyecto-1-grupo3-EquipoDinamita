@@ -8,51 +8,60 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 #include "./position.hpp"
+
 namespace circuit_escape {
 
 
 // ------------------------------------------------------------------ Grid
-template<typename CellType, std::size_t Rows, std::size_t Columns>
+template<typename CellType>
 class Grid {
-    static_assert(Rows > 0 && Columns > 0,
-                  "Grid requiere al menos una fila y una columna");
-
 public:
     using value_type = CellType;
-    using storage_type = std::array<CellType, Rows * Columns>;
+    using storage_type = std::vector<CellType>;
     using iterator = typename storage_type::iterator;
     using const_iterator = typename storage_type::const_iterator;
 
-    static constexpr std::size_t rows() noexcept { return Rows; }
-    static constexpr std::size_t columns() noexcept { return Columns; }
+    static constexpr std::size_t max_side = 100;
 
-    [[nodiscard]] constexpr bool contains(Position position) const noexcept {
-        return position.row < Rows && position.column < Columns;
+    Grid(std::size_t rows, std::size_t columns) : rows_(rows), columns_(columns), cells_(checked_size(rows,columns)) {}
+
+    std::size_t rows() const noexcept { return rows_; }
+    std::size_t columns() const noexcept { return columns_; }
+
+    [[nodiscard]] bool contains(Position position) const noexcept {
+        return position.row < rows_ && position.column < columns_;
     }
 
     CellType& at(Position position) {
         check(position);
-        return cells_[position.row * Columns + position.column];
+        return cells_[position.row * columns_ + position.column];
     }
 
     const CellType& at(Position position) const {
         check(position);
-        return cells_[position.row * Columns + position.column];
+        return cells_[position.row * columns_ + position.column];
     }
 
     CellType& operator()(std::size_t row, std::size_t column) {
         return at({row, column});
     }
+
     const CellType& operator()(std::size_t row, std::size_t column) const {
         return at({row, column});
     }
 
     // Convierte un índice lineal (orden por filas) en posición.
-    [[nodiscard]] static constexpr Position positionOf(std::size_t index) noexcept {
-        return {index / Columns, index % Columns};
+    [[nodiscard]] Position positionOf(std::size_t index) const noexcept {
+        return {index / columns_, index % columns_};
     }
 
+    [[nodiscard]] std::optional<Position> neighbor(Position origin, Action action) const {
+        const auto candidate = circuit_escape::neighbor(origin, action);
+        if (!candidate || !contains(*candidate)) return std::nullopt;
+        return candidate;
+    }
     iterator begin() noexcept { return cells_.begin(); }
     iterator end() noexcept { return cells_.end(); }
     const_iterator begin() const noexcept { return cells_.begin(); }
@@ -61,15 +70,26 @@ public:
     const_iterator cend() const noexcept { return cells_.cend(); }
 
 private:
+    std::size_t rows_;
+    std::size_t columns_;
+    storage_type cells_;
+    static std::size_t checked_size(std::size_t rows, std::size_t columns) {
+        if (rows == 0 || columns == 0) {
+            throw std::invalid_argument("Grid: filas y columnas deben ser mayores que 0");
+        }
+        if (rows>max_side || columns>max_side) {
+            throw std::invalid_argument("Grid: el maximo es " + std::to_string(max_side) + " filas y " + std::to_string(max_side) + " columnas ");
+        }
+        return rows * columns;
+    }
     void check(Position position) const {
         if (!contains(position)) {
-            throw std::out_of_range("Grid: posicion fuera del tablero " +
-                                    toString(position));
+            throw std::out_of_range("Grid: posicion fuera del tablero " + toString(position));
         }
     }
-
-    storage_type cells_{};
 };
+
+
 
 // ------------------------------------------- Templates de función (rangos)
 
@@ -93,12 +113,12 @@ template<typename InputIt, typename Predicate>
 }
 
 // Posición de la primera celda que cumple pred, si existe.
-template<typename CellType, std::size_t Rows, std::size_t Columns, typename Predicate>
+template<typename CellType, typename Predicate>
 [[nodiscard]] std::optional<Position> findPosition(
-    const Grid<CellType, Rows, Columns>& grid, Predicate pred) {
+    const Grid<CellType>& grid, Predicate pred) {
     const auto it = findFirstCell(grid.begin(), grid.end(), pred);
     if (it == grid.end()) return std::nullopt;
-    return Grid<CellType, Rows, Columns>::positionOf(
+    return grid.positionOf(
         static_cast<std::size_t>(std::distance(grid.begin(), it)));
 }
 
