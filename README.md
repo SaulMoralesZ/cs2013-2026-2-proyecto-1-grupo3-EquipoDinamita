@@ -13,7 +13,7 @@ y dibuja el estado.
 
 ### Requisitos
 - **CMake** 3.10 o superior
-- **Compilador C++20**: 
+- **Compilador C++20**:
   - Linux: `gcc` / `g++`
   - Windows: Visual Studio 2019+ o MinGW
   - macOS: Clang
@@ -146,11 +146,14 @@ terminal integrada de CLion o agregar la carpeta `bin` de CMake al `PATH`.
 
 | Ejecutable | Qué verifica |
 |---|---|
-| `grid_test` | acceso válido e inválido, bordes y esquinas, recorrido por filas, algoritmos genéricos con rangos vacíos y con `vector` y `list` |
+| `grid_test` | dimensiones válidas (3×4 a 40×60) e inválidas (0, sobre el límite), acceso válido e inválido, vecindad en los cuatro bordes, recorrido por filas, algoritmos genéricos con rangos vacíos y con `vector` y `list` |
+| `scenario_test` | `Scenario` válido; rechazo de salidas, posiciones, celdas y reglas inválidas; `reset`; `entry_cost`; orden de `Position`; lectura de archivos con fin de línea CRLF |
+| `turn_test` | turno en tres métodos y su orden obligatorio, vigilante solo en turnos pares, A y B en ambos órdenes, salida sin A y B, capturas, energía 0 en la salida, último turno, determinismo |
+| `observation_test` | la observación trae mapa, interruptores y posición del vigilante; una política de vigilante adaptada con `PolicyController` persigue y captura |
 | `environment_test` | movimiento, costos configurados, acciones disponibles, perfiles, término de la partida y su precedencia |
 | `interactions_test` | recursos, baterías, trampas y eventos generados |
 | `controllers_test` | controladores aleatorio y heurístico, reproducibilidad con la misma semilla |
-| `ui_test` | traducción de teclas sin distinguir mayúsculas, rechazo de comandos desconocidos sin modificar el entorno, glifos emoji y ASCII de las 7 celdas, tablero 20×30 de 62 columnas |
+| `ui_test` | traducción de teclas sin distinguir mayúsculas, rechazo de comandos desconocidos sin modificar el entorno, glifos emoji y ASCII (celdas, vigilante e interruptores), tableros de cualquier tamaño, ayuda H sin avanzar turno, tamaño mínimo de terminal |
 
 `ui_test` se ejecuta sin abrir una terminal interactiva: renderiza en una pantalla de FTXUI en
 memoria.
@@ -220,8 +223,9 @@ puede mostrar cuadros vacíos o desalinear las coordenadas; en ese caso usar `--
 | `A` / ← | mover a la izquierda |
 | `D` / → | mover a la derecha |
 | `E` | esperar un turno |
-| `H` | mostrar u ocultar la ayuda |
-| `Q` / `Esc` | abandonar la partida |
+| `H` | abrir o cerrar la ayuda (con la ayuda abierta no pasa ningún turno) |
+| `Esc` | cerrar la ayuda; con la ayuda cerrada, abandonar la partida |
+| `Q` | abandonar la partida |
 
 Las letras funcionan en mayúscula o minúscula. Una tecla desconocida muestra un aviso y no
 consume turno.
@@ -238,6 +242,12 @@ consume turno.
 | ⚡ | `B` | batería |
 | 💥 | `T` | trampa |
 | 🏁 | `S` | salida |
+| 👾 | `G` | vigilante |
+| 🔴 | `!` | interruptor pendiente |
+| 🟢 | `+` | interruptor activado |
+
+Los tres últimos solo aparecen en partidas con vigilante (Proyecto 2). Una segunda línea bajo la
+barra de estado muestra el estado de A y B y si el vigilante se mueve tras tu acción.
  
 ---
 ## Reglas y perfiles de dificultad
@@ -251,7 +261,8 @@ consume turno.
 - **Victoria:** llegar a la salida con energía mayor que 0.
 - **Derrota:** quedarse sin energía o alcanzar el límite de turnos.
 - Si en el mismo turno se cumplen varias condiciones, la precedencia es: salida, luego energía
-  agotada, luego límite de turnos.
+  agotada, luego límite de turnos. (Con vigilante y interruptores la precedencia cambia; ver
+  [Orden del turno](#orden-del-turno-con-vigilante).)
   | Parámetro | easy | standard | hard |
   |---|---|---|---|
   | Energía inicial y máxima | 80 | 60 | 40 |
@@ -303,6 +314,55 @@ Los escenarios están en `assets/maps/` como texto plano, una fila por línea:
 
 ---
 
+## Reutilización del Proyecto 1 (Bloque 1)
+
+Qué se conservó del Proyecto 1, cómo se adaptó, dónde se usa hoy y qué prueba lo verifica.
+
+| Componente original | Adaptación | Uso actual | Prueba |
+|---|---|---|---|
+| `Grid<CellType, Rows, Columns>` | Filas y columnas pasan al constructor; `std::array` → `std::vector`; se conservan `Position`, `neighbor`, `at`/`operator()` e iteradores; se valida `0 < lado <= max_side` | Tablero de cualquier tamaño en el motor y la consola | `grid_test` |
+| `Position` | Se conserva `{row, column}`; se añade `operator<=>` | Desempates y contenedores ordenados | `scenario_test` |
+| `countCells`, `findFirstCell`, `findPosition` | Sin cambio de firma | El constructor del motor cuenta las salidas (`countCells`) y localiza la salida (`findPosition`) | `grid_test`, `scenario_test` |
+| `NavigationEnvironment` (`reset`, `state`, `step`) | Ya no es template; se construye desde un `Scenario` validado. El turno se parte en `step_player` / `step_guard` / `finish_turn`; se añaden interruptores A y B, vigilante y captura. `step` se conserva para las pruebas del Proyecto 1 | Partida con A, B y vigilante | `scenario_test`, `turn_test`, `environment_test` |
+| `entryCost` (privado) | Pasa a `entry_cost(cell, rules)`, público | El motor; Dijkstra y la ayuda H usarán la misma función | `scenario_test` |
+| `EndReason` y `firstEnd` | Se añade `captured`; el orden de comprobaciones pasa a captura → energía → interruptor → escape → límite | Resultado del turno | `turn_test` |
+| `Observation` | Añade mapa de solo lectura, estado de A y B y posición del vigilante | Entrada del controlador del vigilante | `observation_test` |
+| `IController`, concept `NavigationPolicy`, `PolicyController<Policy>` | Sin cambios de contrato | El vigilante se adapta como política con `PolicyController` (la política BFS está en integración) | `controllers_test`, `observation_test` |
+| `ConsoleUI` | Se quitan `Rows`/`Columns`; dibuja vigilante e interruptores; ayuda H que no avanza turno; aviso de terminal pequeña | `app/main.cpp` | `ui_test` |
+| `parseScenario` | Devuelve `BoardLayout` (tablero e inicio) para los mapas del Proyecto 1 | `app/main.cpp` mientras se cargan mapas de ese formato | `scenario_test` |
+
+### Nombres heredados y nuevos
+
+Los tipos usan `PascalCase` y las funciones **nuevas** `snake_case` (`step_player`, `finish_turn`,
+`guard_moves_this_turn`, `entry_cost`, `player_position`, `resolve_command`…). Los nombres del
+Proyecto 1 no se renombran para no romper el código y las pruebas heredadas: `step`, `reset`,
+`state`, `availableActions`, `selectAction`, `positionOf`, `countCells`, `findFirstCell`,
+`findPosition`, `isFinished`, `endReason`, `rulesFor`.
+
+### Orden del turno con vigilante
+
+Un turno son tres llamadas al motor, en este orden:
+
+1. `step_player(accion)`: el jugador mueve o espera; el motor aplica costos e interacciones y
+   comprueba la captura inicial (el jugador pisó al vigilante).
+2. `step_guard(accion)`: solo en turnos pares (los turnos se cuentan desde 1). El motor valida
+   la acción contra `guard_legal_actions()`; el vigilante no gasta energía del jugador ni
+   recoge baterías o recursos.
+3. `finish_turn()`: comprobaciones finales, en este orden: **captura**, **energía agotada**,
+   **activar el interruptor** de la casilla del jugador, **escape** (en la salida, con A y B
+   activos y energía positiva) y **límite de turnos**.
+
+Consecuencias: la captura tiene prioridad sobre el escape; el último turno permitido cuenta (el
+escape se comprueba antes del límite); pisar la salida sin A y B no gana ni termina la partida.
+El motor lanza `std::logic_error` si las llamadas se hacen fuera de orden.
+
+**Decisión sobre los interruptores.** Se activan en el paso final del turno, solo si ese turno no
+termina en derrota. Quién gana o pierde es idéntico a activarlos al entrar; la única diferencia
+visible es que, si te capturan en el mismo turno en que pisas A, A queda sin activar. La
+activación vive en una sola función (`activate_switch_at`), llamada desde un único lugar.
+
+---
+
 ## Decisiones de diseño principales
 
 El detalle está en [`docs/design.md`](docs/design.md). En resumen:
@@ -324,7 +384,7 @@ El detalle está en [`docs/design.md`](docs/design.md). En resumen:
 
 | Contenedor / utilidad | Dónde | Por qué |
 |---|---|---|
-| `std::array` | almacenamiento de `Grid` | el tamaño del tablero se conoce en compilación; memoria contigua y sin reservas dinámicas |
+| `std::vector` | almacenamiento de `Grid` | filas y columnas se eligen al ejecutar (Proyecto 2); memoria contigua y acceso por índice |
 | `std::vector` | eventos de `StepResult`, acciones disponibles, líneas del mapa | la cantidad varía en cada turno y solo se agrega al final |
 | `std::deque` | eventos recientes en `app/main.cpp` | ventana de los últimos eventos: se agrega al final y se descarta al inicio en O(1) |
 | `std::span` | parámetros `legalActions` y `recentEvents` | vista sin copia sobre un vector existente |
@@ -342,7 +402,7 @@ El detalle y la justificación de cada decisión están en [`docs/design.md`](do
 
 | Tema | Dónde |
 |---|---|
-| Template de clase con parámetros tipo y no-tipo | `Grid<CellType, Rows, Columns>` en `grid.hpp` |
+| Template de clase | `Grid<CellType>` en `grid.hpp` (en el Proyecto 1 tenía además `Rows` y `Columns` no-tipo; en el 2 son parámetros del constructor) |
 | Templates de función con iteradores | `countCells`, `findFirstCell` en `grid.hpp`; `bestAction` en `controllers.hpp` |
 | Template usado con dos contenedores | `countCells` con `std::vector` y `std::list` en `tests/grid_test.cpp` |
 | Especialización total | `CellTraits<Wall>`, `CellTraits<Battery>` en `cells.hpp` |
@@ -358,6 +418,8 @@ El detalle y la justificación de cada decisión están en [`docs/design.md`](do
 ## Limitaciones conocidas
 
 - La vista emoji depende de la fuente y de la terminal; en consolas antiguas usar `--ascii`.
+- Cada celda ocupa 2 columnas en ambos modos: un tablero de 40×60 necesita una terminal de al
+  menos 122×43 (122×44 con vigilante). Si es menor, el juego lo avisa y no deja jugar.
 - El programa debe ejecutarse desde la raíz del repositorio para encontrar los mapas por defecto.
 
 
@@ -366,7 +428,7 @@ El detalle y la justificación de cada decisión están en [`docs/design.md`](do
 ## 📚 Librerías
 
 - **FTXUI v7.0.3**: Interfaz de terminal interactiva (se descarga automáticamente)
-    o con sudo apt install libftxui-dev (Ubuntu/debian base)
+  o con sudo apt install libftxui-dev (Ubuntu/debian base)
 - **C++20**: Estándar de lenguaje usado en el proyecto
 
 ---
@@ -437,5 +499,3 @@ cmake ..
 - Treicy Calsina
 
 ---
-
-Para más ayuda, contacta al equipo. 💪

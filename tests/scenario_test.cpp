@@ -1,6 +1,8 @@
 #undef NDEBUG
 #include <cassert>
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -154,6 +156,21 @@ void parseScenarioSigueDandoTableroEInicio() {
     assert((diseno.start == Position{1, 1}));
 }
 
+void readLinesIgnoraElRetornoDeCarro() {
+    const auto ruta = std::filesystem::temp_directory_path() / "circuit_escape_crlf_test.txt";
+    {
+        std::ofstream archivo(ruta, std::ios::binary);
+        archivo << "#####\r\n#@.S#\r\n#####\r\n";
+    }
+    const auto lineas = readLines(ruta);
+    std::filesystem::remove(ruta);
+
+    assert(lineas.size() == 3);
+    for (const auto& linea : lineas) assert(linea.size() == 5 && linea.back() != '\r');
+    const auto diseno = parseScenario(lineas);
+    assert(diseno.grid.rows() == 3 && diseno.grid.columns() == 5);
+}
+
 }
 
 int main() {
@@ -169,5 +186,6 @@ int main() {
     costoDeEntradaCompartido();
     ordenDePosiciones();
     parseScenarioSigueDandoTableroEInicio();
+    readLinesIgnoraElRetornoDeCarro();
     return 0;
 }
