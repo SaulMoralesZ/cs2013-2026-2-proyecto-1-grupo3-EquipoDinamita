@@ -19,6 +19,12 @@ El proyecto amplía el motor del Proyecto 1 con:
 
 El README del Proyecto 1 se conserva en [`README (viejo-proyecto1).md`](README%20%28viejo-proyecto1%29.md).
 
+### Documentación visual
+
+El proyecto explicado con diagramas está en
+**[`docs/documentacion_graficos.excalidraw`](docs/documentacion_graficos.excalidraw)**.
+Para verlo, descárguelo y ábralo en [excalidraw.com](https://excalidraw.com) (menú ☰ → *Open*).
+
 ---
 
 ## Contenido
@@ -642,6 +648,3 @@ CPack. Los paquetes incluyen solo `mapa_facil/medio/dificil.txt` y los mapas del
 - Saul Morales
 - Rafael Vargas
 - Treicy Calsina
-
-Guía de trabajo en equipo: [`docs/contributions.md`](docs/contributions.md). Diagramas editables:
-[`docs/documentacion_graficos.excalidraw`](docs/documentacion_graficos.excalidraw).
