@@ -10,6 +10,7 @@
 
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
+#include <ftxui/screen/terminal.hpp>
 
 #include "./cells.hpp"
 #include "./environment.hpp"
@@ -22,6 +23,10 @@ struct QuitCommand {};
 struct HelpCommand {};
 
 using UiCommand = std::variant<Action, QuitCommand, HelpCommand>;
+
+enum class UiOutcome { quit, open_help, close_help, play_action };
+[[nodiscard]] UiOutcome resolve_command(const UiCommand& command, bool help_open,
+                                            bool escape_pressed) noexcept;
 
 enum class RenderMode { emoji, ascii };
 
@@ -42,38 +47,40 @@ public:
     [[nodiscard]] std::string glyphFor(const Cell& cell) const;
     [[nodiscard]] std::string agentGlyph() const;
     [[nodiscard]] std::string emptyGlyph() const;
+    [[nodiscard]] std::string guardGlyph() const;
+    [[nodiscard]] std::string switchGlyph(bool active) const;
     [[nodiscard]] std::string coordinateLabel(std::size_t index) const;
     
     [[nodiscard]] static bool isKeyboardEvent(const ftxui::Event& event);
 
     [[nodiscard]] ftxui::Element help() const;
+    [[nodiscard]] ftxui::Dimensions required_size(const NavigationEnvironment& environment) const;
+    [[nodiscard]] ftxui::Element too_small_message(ftxui::Dimensions required, ftxui::Dimensions actual) const;
     [[nodiscard]] ftxui::Element notice(const std::string& text) const;
 
     [[nodiscard]] std::string lastEventText(std::span<const NavigationEvent> stepEvents) const;
 
-    template<std::size_t Rows, std::size_t Columns>
     [[nodiscard]] ftxui::Element render(
-        const NavigationEnvironment<Rows, Columns>& environment,
+        const NavigationEnvironment& environment,
         std::span<const NavigationEvent> recentEvents) const {
         const Observation state = environment.state();
+        const auto& grid = environment.grid();
 
         ftxui::Elements lines;
-        lines.push_back(statusBar(state, environment.totalResources(),
-                                  environment.rules().turnLimit));
-        lines.push_back(horizontalRuler(Columns));
+        lines.push_back(statusBar(state, environment.totalResources(), environment.rules().turnLimit));
+        if (const std::string objectives = objectivesStatus(environment); !objectives.empty()) {
+            lines.push_back(ftxui::text(objectives) | ftxui::bold);
+        }
+        lines.push_back(horizontalRuler(grid.columns()));
 
-        for (std::size_t row = 0; row < Rows; ++row) {
+        for (std::size_t row = 0; row < grid.rows(); ++row) {
             ftxui::Elements cells;
             cells.push_back(cellBox(coordinateLabel(row)));
-            for (std::size_t column = 0; column < Columns; ++column) {
+            for (std::size_t column = 0; column < grid.columns(); ++column) {
                 const Position position{row, column};
-                cells.push_back(cellBox(position == state.agent
-                                            ? agentGlyph()
-                                            : glyphFor(environment.grid().at(position))));
-            }
+                cells.push_back(cellBox(glyphAt(environment, position)));            }
             lines.push_back(ftxui::hbox(std::move(cells)));
         }
-
         lines.push_back(footer(recentEvents, environment.endReason()));
         return ftxui::vbox(std::move(lines));
     }
@@ -82,9 +89,10 @@ private:
     [[nodiscard]] ftxui::Element statusBar(const Observation& state,
                                           std::size_t totalResources,
                                           std::size_t turnLimit) const;
+    [[nodiscard]] std::string glyphAt(const NavigationEnvironment& environment, Position position) const;
+    [[nodiscard]] std::string objectivesStatus(const NavigationEnvironment& environment) const;
     [[nodiscard]] ftxui::Element horizontalRuler(std::size_t columns) const;
-    [[nodiscard]] ftxui::Element footer(std::span<const NavigationEvent> recentEvents,
-                                       EndReason reason) const;
+    [[nodiscard]] ftxui::Element footer(std::span<const NavigationEvent> recentEvents, EndReason reason) const;
 
     RenderMode mode_;
 };

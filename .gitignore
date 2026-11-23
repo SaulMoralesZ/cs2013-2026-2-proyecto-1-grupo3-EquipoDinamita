@@ -1,9 +1,10 @@
 # CMake build directories
 build/
+build-*/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
-*.cmake
+dist/
 
 # Build artifacts
 *.o

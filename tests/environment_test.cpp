@@ -10,8 +10,8 @@ using namespace circuit_escape;
 
 namespace {
 
-Grid<Cell, 3, 4> tableroBase() {
-    Grid<Cell, 3, 4> grid;
+Grid<Cell> tableroBase() {
+    Grid<Cell> grid(3, 4);
     for (std::size_t column = 0; column < 4; ++column) {
         grid.at({0, column}) = Wall{};
         grid.at({2, column}) = Wall{};
@@ -22,21 +22,21 @@ Grid<Cell, 3, 4> tableroBase() {
 }
 
 void precondicionesDelConstructor() {
-    Grid<Cell, 3, 4> sinSalida = tableroBase();
+    Grid<Cell> sinSalida = tableroBase();
     sinSalida.at({1, 3}) = Empty{};
     bool lanzoSinSalida = false;
     try {
-        NavigationEnvironment<3, 4> entorno(sinSalida, {1, 1});
+        NavigationEnvironment entorno(sinSalida, {1, 1});
     } catch (const std::invalid_argument&) {
         lanzoSinSalida = true;
     }
     assert(lanzoSinSalida);
 
-    Grid<Cell, 3, 4> dosSalidas = tableroBase();
+    Grid<Cell> dosSalidas = tableroBase();
     dosSalidas.at({1, 2}) = Exit{};
     bool lanzoDosSalidas = false;
     try {
-        NavigationEnvironment<3, 4> entorno(dosSalidas, {1, 1});
+        NavigationEnvironment entorno(dosSalidas, {1, 1});
     } catch (const std::invalid_argument&) {
         lanzoDosSalidas = true;
     }
@@ -44,7 +44,7 @@ void precondicionesDelConstructor() {
 
     bool lanzoInicioBloqueado = false;
     try {
-        NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 0});
+        NavigationEnvironment entorno(tableroBase(), {1, 0});
     } catch (const std::invalid_argument&) {
         lanzoInicioBloqueado = true;
     }
@@ -52,7 +52,7 @@ void precondicionesDelConstructor() {
 
     bool lanzoFueraDelTablero = false;
     try {
-        NavigationEnvironment<3, 4> entorno(tableroBase(), {5, 5});
+        NavigationEnvironment entorno(tableroBase(), {5, 5});
     } catch (const std::invalid_argument&) {
         lanzoFueraDelTablero = true;
     }
@@ -61,7 +61,7 @@ void precondicionesDelConstructor() {
 
 void estadoInicial() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroBase(), {1, 1}, reglas);
     const auto estado = entorno.state();
 
     assert((estado.agent == Position{1, 1}));
@@ -76,7 +76,7 @@ void estadoInicial() {
 
 void movimientoLibreYCosto() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroBase(), {1, 1}, reglas);
 
     const auto resultado = entorno.step(Action::right);
     assert((resultado.observation.agent == Position{1, 2}));
@@ -97,22 +97,22 @@ void movimientoLibreYCosto() {
 void costoDeEsperaYDeTerrenoElevado() {
     const auto reglas = rulesFor(Difficulty::standard);
 
-    NavigationEnvironment<3, 4> esperando(tableroBase(), {1, 1}, reglas);
+    NavigationEnvironment esperando(tableroBase(), {1, 1}, reglas);
     const auto trasEsperar = esperando.step(Action::wait);
     assert((trasEsperar.observation.agent == Position{1, 1}));
     assert(trasEsperar.observation.energy == reglas.initialEnergy - reglas.waitCost);
     assert(trasEsperar.observation.turn == 1);
 
-    Grid<Cell, 3, 4> conTerrenoElevado = tableroBase();
+    Grid<Cell> conTerrenoElevado = tableroBase();
     conTerrenoElevado.at({1, 2}) = RoughTerrain{};
-    NavigationEnvironment<3, 4> elevado(conTerrenoElevado, {1, 1}, reglas);
+    NavigationEnvironment elevado(conTerrenoElevado, {1, 1}, reglas);
     const auto trasElevado = elevado.step(Action::right);
     assert(trasElevado.observation.energy == reglas.initialEnergy - reglas.roughCost);
     assert(reglas.roughCost != reglas.baseCost);
 }
 
 void llegadaALaSalida() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     (void)entorno.step(Action::right);
     const auto resultado = entorno.step(Action::right);
 
@@ -131,7 +131,7 @@ void llegadaALaSalida() {
 void terminoPorLimiteDeTurnos() {
     GameRules reglas = rulesFor(Difficulty::standard);
     reglas.turnLimit = 2;
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroBase(), {1, 1}, reglas);
 
     const auto primero = entorno.step(Action::wait);
     assert(!primero.finished);
@@ -144,7 +144,7 @@ void terminoPorLimiteDeTurnos() {
 void stepDespuesDelTermino() {
     GameRules reglas = rulesFor(Difficulty::standard);
     reglas.turnLimit = 1;
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroBase(), {1, 1}, reglas);
     (void)entorno.step(Action::wait);
     assert(entorno.isFinished());
 
@@ -158,7 +158,7 @@ void stepDespuesDelTermino() {
 }
 
 void resetRestauraLaPartida() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     (void)entorno.step(Action::right);
     (void)entorno.step(Action::right);
     assert(entorno.isFinished());

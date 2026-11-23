@@ -12,6 +12,7 @@
 
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
+#include <ftxui/screen/terminal.hpp>
 
 #include "circuit_escape/console_ui.hpp"
 #include "circuit_escape/controllers.hpp"
@@ -105,11 +106,9 @@ std::optional<Options> parseOptions(int argc, char** argv) {
     return options;
 }
 
-template<std::size_t Rows, std::size_t Columns>
 void runGame(const std::vector<std::string>& lines, const Options& options) {
-    const auto scenario = parseScenario<Rows, Columns>(lines);
-    NavigationEnvironment<Rows, Columns> environment(scenario.grid, scenario.start,
-                                                     rulesFor(options.difficulty));
+    const auto scenario = parseScenario(lines);
+    NavigationEnvironment environment(scenario.grid, scenario.start, rulesFor(options.difficulty));
     environment.reset(options.seed);
 
     ConsoleUI ui(options.renderMode);
@@ -135,8 +134,18 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
         lastEvents = result.events;
     };
 
+    // El tablero no cabe en la terminal: se muestra un mensaje y no se juega a ciegas.
+    const auto terminalTooSmall = [&] {
+        const auto required = ui.required_size(environment);
+        const auto actual = ftxui::Terminal::Size();
+        return actual.dimx < required.dimx || actual.dimy < required.dimy;
+    };
+
     auto document = ftxui::Renderer([&] {
         if (showHelp) return ui.help();
+        if (terminalTooSmall()) {
+            return ui.too_small_message(ui.required_size(environment), ftxui::Terminal::Size());
+        }
 
         ftxui::Elements lines_;
         lines_.push_back(ui.render(environment, lastEvents));
@@ -152,35 +161,35 @@ void runGame(const std::vector<std::string>& lines, const Options& options) {
             return true;
         }
 
-        return std::visit(
-            Overloaded{
-                [&](QuitCommand) {
-                    screen.Exit();
-                    return true;
-                },
-                [&](HelpCommand) {
-                    showHelp = !showHelp;
-                    notice.clear();
-                    return true;
-                },
-                [&](Action action) {
-                    if (showHelp) {
-                        showHelp = false;
-                        return true;
-                    }
-                    if (controller) {
-                        if (environment.isFinished()) {
-                            notice = "La partida termino. Q para salir.";
-                            return true;
-                        }
-                        const auto state = environment.state();
-                        advance(controller->selectAction(state, state.availableActions));
-                        return true;
-                    }
-                    advance(action);
-                    return true;
-                }},
-            *command);
+        switch (resolve_command(*command, showHelp, event == ftxui::Event::Escape)) {
+            case UiOutcome::quit:
+                screen.Exit();
+                return true;
+            case UiOutcome::open_help:
+                showHelp = true;
+                notice.clear();
+                return true;
+            case UiOutcome::close_help:
+                // H, Esc o una tecla de juego solo cierran la ayuda: no pasa ningun turno.
+                showHelp = false;
+                notice.clear();
+                return true;
+            case UiOutcome::play_action:
+                break;
+        }
+
+        if (terminalTooSmall()) return true;  // sin ver el tablero no se juega
+        if (controller) {
+            if (environment.isFinished()) {
+                notice = "La partida termino. Q para salir.";
+                return true;
+            }
+            const auto state = environment.state();
+            advance(controller->selectAction(state, state.availableActions));
+            return true;
+        }
+        advance(std::get<Action>(*command));
+        return true;
     });
 
     screen.Loop(document);
@@ -206,20 +215,10 @@ int main(int argc, char** argv) {
             std::cerr << "El escenario esta vacio: " << options->scenario << '\n';
             return 1;
         }
-
-        const std::size_t rows = lines.size();
-        const std::size_t columns = lines.front().size();
-
-        if (rows != 20 || columns != 30) {
-            std::cerr << "El escenario debe ser de 20x30 y tiene " << rows << "x" << columns
-                      << ": " << options->scenario << '\n';
-            return 1;
-        }
-        runGame<20, 30>(lines, *options);
+        runGame(lines, *options);
     } catch (const std::exception& error) {
         std::cerr << "ERROR: " << error.what() << '\n';
         return 1;
     }
-
     return 0;
 }

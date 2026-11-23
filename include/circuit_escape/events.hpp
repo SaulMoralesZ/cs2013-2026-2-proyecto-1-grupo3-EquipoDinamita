@@ -5,9 +5,13 @@
 #include <variant>
 #include <vector>
 
+#include "cells.hpp"
+#include "grid.hpp"
 #include "position.hpp"
 
 namespace circuit_escape {
+
+enum class SwitchId {a,b};
 
 struct Observation {
     Position agent;
@@ -18,6 +22,10 @@ struct Observation {
     std::size_t collectedResources{};
     std::size_t turn{};
     std::vector<Action> availableActions;
+    const Grid<Cell>* map{nullptr};
+    bool switch_a_active{false};
+    bool switch_b_active{false};
+    Position guard{};
 };
 
 struct MovedEvent {
@@ -49,20 +57,38 @@ struct GoalReachedEvent {
     Position at;
 };
 
+struct GuardMovedEvent {
+    Position from;
+    Position to;
+};
+
+struct SwitchActivatedEvent {
+    SwitchId id;
+    Position at;
+};
+
+struct CapturedEvent {
+    Position at;
+};
+
 using NavigationEvent = std::variant<
     MovedEvent,
     MovementRejectedEvent,
     ResourceCollectedEvent,
     EnergyChangedEvent,
     TrapTriggeredEvent,
-    GoalReachedEvent
+    GoalReachedEvent,
+    GuardMovedEvent,
+    SwitchActivatedEvent,
+    CapturedEvent
 >;
 
 enum class EndReason {
     none,
     goalReached,
     noEnergy,
-    turnLimit
+    turnLimit,
+    captured
 };
 
 struct StepResult {

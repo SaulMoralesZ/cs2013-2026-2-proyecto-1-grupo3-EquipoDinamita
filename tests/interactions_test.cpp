@@ -10,8 +10,8 @@ using namespace circuit_escape;
 
 namespace {
 
-Grid<Cell, 3, 4> tableroCon(Cell enColumnaDos) {
-    Grid<Cell, 3, 4> grid;
+Grid<Cell> tableroCon(Cell enColumnaDos) {
+    Grid<Cell> grid(3,4);
     for (std::size_t column = 0; column < 4; ++column) {
         grid.at({0, column}) = Wall{};
         grid.at({2, column}) = Wall{};
@@ -32,7 +32,7 @@ bool contiene(const std::vector<NavigationEvent>& events) {
 
 void movimientoContraUnMuro() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroCon(Empty{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(Empty{}), {1, 1}, reglas);
 
     const auto resultado = entorno.step(Action::up);  // (0,1) es muro
     assert((resultado.observation.agent == Position{1, 1}));
@@ -45,9 +45,9 @@ void movimientoContraUnMuro() {
 void movimientoFueraDelTablero() {
     const auto reglas = rulesFor(Difficulty::standard);
 
-    Grid<Cell, 1, 3> grid;
+    Grid<Cell> grid(1,3);
     grid.at({0, 2}) = Exit{};
-    NavigationEnvironment<1, 3> entorno(grid, {0, 0}, reglas);
+    NavigationEnvironment entorno(grid, {0, 0}, reglas);
 
     const auto resultado = entorno.step(Action::up);
     assert((resultado.observation.agent == Position{0, 0}));
@@ -57,7 +57,7 @@ void movimientoFueraDelTablero() {
 
 void recoleccionUnicaDelRecurso() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroCon(ResourceCell<int>{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(ResourceCell<int>{}), {1, 1}, reglas);
 
     const auto primera = entorno.step(Action::right);
     assert(primera.observation.score == reglas.resourcePoints);
@@ -75,7 +75,7 @@ void bateriaRecargaTrasPagarElCostoDeEntrada() {
     GameRules reglas = rulesFor(Difficulty::standard);
     reglas.initialEnergy = 1;
     reglas.maximumEnergy = 10;
-    NavigationEnvironment<3, 4> entorno(tableroCon(Battery{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(Battery{}), {1, 1}, reglas);
 
     const auto resultado = entorno.step(Action::right);
     assert(resultado.observation.energy == reglas.batteryRecharge);
@@ -85,7 +85,7 @@ void bateriaRecargaTrasPagarElCostoDeEntrada() {
 
 void bateriaNoSuperaLaEnergiaMaxima() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroCon(Battery{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(Battery{}), {1, 1}, reglas);
 
     const auto resultado = entorno.step(Action::right);
     assert(resultado.observation.energy == reglas.maximumEnergy);
@@ -93,7 +93,7 @@ void bateriaNoSuperaLaEnergiaMaxima() {
 
 void bateriaEsConsumible() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroCon(Battery{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(Battery{}), {1, 1}, reglas);
 
     (void)entorno.step(Action::right);
     (void)entorno.step(Action::left);
@@ -105,7 +105,7 @@ void bateriaEsConsumible() {
 
 void trampaSeActivaCadaVez() {
     const auto reglas = rulesFor(Difficulty::standard);
-    NavigationEnvironment<3, 4> entorno(tableroCon(Trap{}), {1, 1}, reglas);
+    NavigationEnvironment entorno(tableroCon(Trap{}), {1, 1}, reglas);
 
     const auto primera = entorno.step(Action::right);
     assert(primera.observation.energy ==
@@ -131,6 +131,9 @@ void procesamientoDeCadaTipoDeEvento() {
         EnergyChangedEvent{10, 8},
         TrapTriggeredEvent{{0, 1}},
         GoalReachedEvent{{0, 2}},
+        GuardMovedEvent{{1, 1}, {1, 2}},
+        SwitchActivatedEvent{SwitchId::a, {1, 1}},
+        CapturedEvent{{1, 2}},
     };
 
     std::size_t visitados = 0;
@@ -142,6 +145,9 @@ void procesamientoDeCadaTipoDeEvento() {
                        [&](const EnergyChangedEvent&) { ++visitados; },
                        [&](const TrapTriggeredEvent&) { ++visitados; },
                        [&](const GoalReachedEvent&) { ++visitados; },
+                       [&](const GuardMovedEvent&) { ++visitados; },
+                       [&](const SwitchActivatedEvent&) { ++visitados; },
+                       [&](const CapturedEvent&) { ++visitados; },
                    },
                    evento);
         assert(!describe(evento).empty());

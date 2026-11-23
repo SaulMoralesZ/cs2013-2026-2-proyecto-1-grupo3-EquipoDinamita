@@ -13,8 +13,8 @@ using namespace circuit_escape;
 
 namespace {
 
-Grid<Cell, 3, 4> tableroBase() {
-    Grid<Cell, 3, 4> grid;
+Grid<Cell> tableroBase() {
+    Grid<Cell> grid(3,4);
     for (std::size_t column = 0; column < 4; ++column) {
         grid.at({0, column}) = Wall{};
         grid.at({2, column}) = Wall{};
@@ -24,8 +24,8 @@ Grid<Cell, 3, 4> tableroBase() {
     return grid;
 }
 
-Grid<Cell, 3, 3> tableroAbierto() {
-    Grid<Cell, 3, 3> grid;
+Grid<Cell> tableroAbierto() {
+    Grid<Cell> grid(3,3);
     grid.at({2, 2}) = Exit{};
     return grid;
 }
@@ -38,7 +38,7 @@ bool contieneAccion(const std::vector<Action>& acciones, Action buscada) {
 }
 
 void accionesDisponiblesJuntoAUnMuro() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     const auto acciones = entorno.availableActions();
 
     assert(acciones.size() == 2);
@@ -49,9 +49,9 @@ void accionesDisponiblesJuntoAUnMuro() {
 }
 
 void accionesDisponiblesEnUnaEsquina() {
-    Grid<Cell, 1, 3> grid;
+    Grid<Cell> grid(1,3);
     grid.at({0, 2}) = Exit{};
-    NavigationEnvironment<1, 3> entorno(grid, {0, 0});
+    NavigationEnvironment entorno(grid, {0, 0});
     const auto acciones = entorno.availableActions();
 
     assert(acciones.size() == 2);
@@ -60,7 +60,7 @@ void accionesDisponiblesEnUnaEsquina() {
 }
 
 void accionesDisponiblesDespuesDelTermino() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     (void)entorno.step(Action::right);
     (void)entorno.step(Action::right);
     assert(entorno.isFinished());
@@ -70,7 +70,7 @@ void accionesDisponiblesDespuesDelTermino() {
 }
 
 void politicaAleatoriaSoloEligeAccionesLegales() {
-    NavigationEnvironment<3, 3> entorno(tableroAbierto(), {0, 0});
+    NavigationEnvironment entorno(tableroAbierto(), {0, 0});
     auto controlador = makeController(ControllerKind::random, 123);
     assert(controlador != nullptr);
 
@@ -84,7 +84,7 @@ void politicaAleatoriaSoloEligeAccionesLegales() {
 
 void mismaSemillaMismaSimulacion() {
     const auto correr = [](std::uint32_t semilla) {
-        NavigationEnvironment<3, 3> entorno(tableroAbierto(), {0, 0});
+        NavigationEnvironment entorno(tableroAbierto(), {0, 0});
         entorno.reset(semilla);
         auto controlador = makeController(ControllerKind::random, semilla);
 
@@ -105,7 +105,7 @@ void mismaSemillaMismaSimulacion() {
 }
 
 void politicaHeuristicaAlcanzaLaSalida() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     auto controlador = makeController(ControllerKind::heuristic, 0);
 
     int pasos = 0;
@@ -120,7 +120,7 @@ void politicaHeuristicaAlcanzaLaSalida() {
 }
 
 void controladorHumanoRecibeLaDecision() {
-    NavigationEnvironment<3, 4> entorno(tableroBase(), {1, 1});
+    NavigationEnvironment entorno(tableroBase(), {1, 1});
     HumanController humano;
     humano.submit(Action::right);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <compare>
 #include <cstddef>
 #include <functional>
 #include <optional>
@@ -11,7 +12,7 @@ struct Position {
     std::size_t row{};
     std::size_t column{};
 
-    friend bool operator==(const Position&, const Position&) = default;
+    friend auto operator<=>(const Position&, const Position&) = default;
 };
 
 struct PositionHash {
