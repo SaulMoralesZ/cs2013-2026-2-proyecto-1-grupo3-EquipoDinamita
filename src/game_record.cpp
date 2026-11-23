@@ -48,7 +48,9 @@ std::string current_date() {
     const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm local{};
 #if defined(_WIN32)
-    localtime_s(&local, &now);
+    // localtime_s tiene firmas distintas en MSVC y MinGW; std::localtime sirve en ambos
+    // (solo se llama desde el hilo de la interfaz).
+    local = *std::localtime(&now);
 #else
     localtime_r(&now, &local);
 #endif

@@ -1,5 +1,6 @@
 #include "../include/circuit_escape/terminal_launcher.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>

@@ -1,0 +1,75 @@
+# Compila, prueba y empaqueta Circuito de Escape en Windows y Linux.
+# Los paquetes quedan en la pestana "Actions" del repositorio, en la ejecucion
+# correspondiente, seccion "Artifacts":
+#   escape-circuit-windows -> instalador .exe (NSIS) y portable .zip
+#   escape-circuit-linux   -> instalador .deb y portable .tar.gz
+name: Compilar y empaquetar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:  # boton "Run workflow" en la pestana Actions
+
+jobs:
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NSIS (para el instalador)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress
+          }
+          "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Configurar (Release, runtime estatico)
+        run: cmake -S . -B build -A x64 -DCIRCUIT_ESCAPE_STATIC=ON
+
+      - name: Compilar
+        run: cmake --build build --config Release --parallel
+
+      - name: Pruebas
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Empaquetar
+        working-directory: build
+        run: cpack -C Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: escape-circuit-windows
+          path: |
+            build/escape-circuit-*.exe
+            build/escape-circuit-*.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux (GCC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar (Release, estatico)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCIRCUIT_ESCAPE_STATIC=ON
+
+      - name: Compilar
+        run: cmake --build build --parallel
+
+      - name: Pruebas
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Empaquetar
+        working-directory: build
+        run: cpack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: escape-circuit-linux
+          path: |
+            build/escape-circuit*.deb
+            build/escape-circuit*.tar.gz
+          if-no-files-found: error

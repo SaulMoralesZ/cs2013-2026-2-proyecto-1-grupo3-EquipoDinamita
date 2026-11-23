@@ -1,0 +1,29 @@
+CIRCUITO DE ESCAPE - Equipo Dinamita (CS2013 Programacion III, UTEC)
+=====================================================================
+
+JUGAR
+  Doble clic en escape_circuit.exe (o "Circuito de Escape" en el menu Inicio
+  si se instalo). Se abre una consola con el menu:
+    Jugar | Ver partida guardada | Ver solucion del mapa | Como jugar | Salir
+
+  Controles: WASD o flechas mover, E esperar, H ayuda de energia (Dijkstra),
+  R reiniciar, + / - zoom del tablero, M volver al menu.
+  Al terminar una partida, G la guarda para verla despues.
+
+  Los emojis se ven en Windows Terminal (Windows 11). En la consola clasica el
+  juego usa automaticamente simbolos ASCII. Maximice la ventana para ver el
+  tablero mas grande; Ctrl + rueda del raton agranda el texto.
+
+GENERAR MAPAS NUEVOS (opcional)
+  Abra una consola en esta carpeta y ejecute:
+    map_generator.exe --rows 20 --cols 30 --energy 150 --turns 300
+  Los mapas se guardan en %APPDATA%\escape_circuit\maps y el juego los usa
+  en lugar de los incluidos. Ayuda: map_generator.exe --help
+
+ARCHIVOS
+  assets\maps\                mapas incluidos (facil, medio, dificil)
+  %APPDATA%\escape_circuit\   partidas guardadas y mapas generados
+
+DESINSTALAR
+  Instalado: Configuracion > Aplicaciones > "Circuito de Escape" > Desinstalar.
+  Portable: borrar esta carpeta (y %APPDATA%\escape_circuit si se desea).

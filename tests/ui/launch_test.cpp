@@ -17,6 +17,30 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Variables de entorno portables (setenv/unsetenv no existen en Windows).
+void set_env(const char* name, const fs::path& value) {
+#if defined(_WIN32)
+    _putenv_s(name, value.string().c_str());
+#else
+    setenv(name, value.string().c_str(), 1);
+#endif
+}
+
+void unset_env(const char* name) {
+#if defined(_WIN32)
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+}
+
+// Carpeta base de los datos del usuario segun el sistema.
+#if defined(_WIN32)
+constexpr const char* kUserBaseVar = "APPDATA";
+#else
+constexpr const char* kUserBaseVar = "XDG_DATA_HOME";
+#endif
+
 // Simula los programas instalados: nombre -> ruta real.
 auto installed(std::map<std::string, std::string> programs) {
     return [programs](const std::string& name) -> std::optional<std::string> {
@@ -70,7 +94,11 @@ void noTerminalAtAll() {
 }
 
 void findInPathFindsRealPrograms() {
+#if defined(_WIN32)
+    assert(find_in_path("cmd.exe").has_value());
+#else
     assert(find_in_path("sh").has_value());
+#endif
     assert(!find_in_path("programa-que-no-existe-12345").has_value());
 }
 
@@ -109,8 +137,8 @@ void forcedDataDirAndUserDir() {
     TempDir data("forced_data");
     TempDir user("user_data");
     fs::create_directories(data.path / "maps");
-    setenv("CIRCUIT_ESCAPE_DATA", data.path.c_str(), 1);
-    setenv("XDG_DATA_HOME", user.path.c_str(), 1);
+    set_env("CIRCUIT_ESCAPE_DATA", data.path);
+    set_env(kUserBaseVar, user.path);
 
     assert(find_asset_dir() == fs::weakly_canonical(data.path));
     assert(user_data_dir() == user.path / "escape_circuit");
@@ -129,8 +157,8 @@ void forcedDataDirAndUserDir() {
     assert(!has_level_files(data.path / "maps"));
     assert(is_writable_dir(user.path / "nueva" / "carpeta"));
 
-    unsetenv("CIRCUIT_ESCAPE_DATA");
-    unsetenv("XDG_DATA_HOME");
+    unset_env("CIRCUIT_ESCAPE_DATA");
+    unset_env(kUserBaseVar);
 }
 
 }  // namespace

@@ -19,6 +19,13 @@ option(CIRCUIT_ESCAPE_WITH_UI "Construye el ejecutable de consola con FTXUI" ON)
 # distribuciones mas antiguas que la de compilacion. Lo activa installer/build_packages.sh.
 option(CIRCUIT_ESCAPE_STATIC "Enlaza los ejecutables de forma estatica (paquetes portables)" OFF)
 
+# MSVC: con CIRCUIT_ESCAPE_STATIC se usa el runtime estatico (/MT), asi el .exe
+# no necesita el redistribuible de Visual C++. Debe fijarse antes de crear
+# los targets (incluidos los de FTXUI).
+if(MSVC AND CIRCUIT_ESCAPE_STATIC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 set(CIRCUIT_ESCAPE_RUNTIME_DLLS "")
 if(MINGW)
     foreach(dll IN ITEMS libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll)
@@ -35,7 +42,9 @@ endif()
 
 function(circuit_escape_configure target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4)
+        # /utf-8: los fuentes y los textos (emojis, bordes) son UTF-8.
+        target_compile_options(${target} PRIVATE /W4 /utf-8)
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -120,20 +129,31 @@ if(CIRCUIT_ESCAPE_STATIC AND NOT MSVC)
 endif()
 
 # ------------------------------------------------------------- Instalacion
-# Estructura (igual en el .deb y en la carpeta portable):
-#   bin/escape_circuit, bin/map_generator
-#   share/escape_circuit/assets/maps/   mapas por nivel incluidos
-#   share/applications/                 acceso "Circuito de Escape" (Linux)
-#   share/icons/hicolor/scalable/apps/  icono
-# El juego busca los mapas relativos al ejecutable (src/paths.cpp).
+# El juego busca los mapas relativos al ejecutable (src/paths.cpp):
+#   Linux (.deb y .tar.gz)            Windows (instalador y .zip)
+#     bin/escape_circuit                escape_circuit.exe
+#     bin/map_generator                 map_generator.exe
+#     share/escape_circuit/assets/maps  assets/maps
+#     share/applications/  (acceso)     LEEME.txt, README.md
+#     share/icons/...      (icono)
 set(CMAKE_INSTALL_DOCDIR "share/doc/escape-circuit")
 include(GNUInstallDirs)
-install(TARGETS map_generator RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(WIN32)
+    set(CIRCUIT_ESCAPE_BIN_DIR ".")
+    set(CIRCUIT_ESCAPE_ASSET_DIR "assets")
+    set(CIRCUIT_ESCAPE_DOC_DIR ".")
+else()
+    set(CIRCUIT_ESCAPE_BIN_DIR "${CMAKE_INSTALL_BINDIR}")
+    set(CIRCUIT_ESCAPE_ASSET_DIR "${CMAKE_INSTALL_DATADIR}/escape_circuit/assets")
+    set(CIRCUIT_ESCAPE_DOC_DIR "${CMAKE_INSTALL_DOCDIR}")
+endif()
+
+install(TARGETS map_generator RUNTIME DESTINATION ${CIRCUIT_ESCAPE_BIN_DIR})
 if(CIRCUIT_ESCAPE_WITH_UI)
-    install(TARGETS escape_circuit RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS escape_circuit RUNTIME DESTINATION ${CIRCUIT_ESCAPE_BIN_DIR})
 endif()
 # Solo el lote por nivel y los mapas del Proyecto 1 (no los mapa_N sueltos).
-install(DIRECTORY assets/maps/ DESTINATION ${CMAKE_INSTALL_DATADIR}/escape_circuit/assets/maps
+install(DIRECTORY assets/maps/ DESTINATION ${CIRCUIT_ESCAPE_ASSET_DIR}/maps
         FILES_MATCHING
         PATTERN "mapa_facil.txt" PATTERN "mapa_medio.txt" PATTERN "mapa_dificil.txt"
         PATTERN "scenario_*.txt")
@@ -143,31 +163,49 @@ if(UNIX AND NOT APPLE)
     install(FILES installer/linux/escape-circuit.svg
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 endif()
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+if(WIN32)
+    install(FILES installer/windows/LEEME.txt DESTINATION ${CIRCUIT_ESCAPE_DOC_DIR})
+endif()
+install(FILES README.md DESTINATION ${CIRCUIT_ESCAPE_DOC_DIR})
 
 # --------------------------------------------------------------- Paquetes
-# cpack genera: .deb (instalador para Ubuntu/Debian) y .tar.gz (portable).
+# Linux:   cpack -> .deb (instalador) y .tar.gz (portable)
+# Windows: cpack -> instalador NSIS (.exe) y .zip (portable)
 set(CPACK_PACKAGE_NAME "escape-circuit")
 set(CPACK_PACKAGE_VENDOR "Equipo Dinamita - CS2013 UTEC")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_PACKAGE_FILE_NAME "escape-circuit-${PROJECT_VERSION}-linux-x86_64")
-set(CPACK_GENERATOR "DEB;TGZ")
 set(CPACK_STRIP_FILES ON)
-# Portable: carpeta escape-circuit-<version>-linux-x86_64/ con bin/ y share/.
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
-# Debian / Ubuntu
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Equipo Dinamita - CS2013 UTEC")
-set(CPACK_DEBIAN_PACKAGE_SECTION "games")
-set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
-set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
-set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
-    "Activa los interruptores A y B y escapa sin que te atrape el vigilante.\n\
-Incluye escape_circuit (juego) y map_generator (preparacion concurrente de mapas).")
-if(CIRCUIT_ESCAPE_STATIC)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "")  # ejecutables estaticos: sin dependencias
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)  # portable: una carpeta con todo
+
+if(WIN32)
+    set(CPACK_PACKAGE_FILE_NAME "escape-circuit-${PROJECT_VERSION}-windows-x86_64")
+    set(CPACK_GENERATOR "NSIS;ZIP")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "Circuito de Escape")
+    # Acceso en el menu Inicio y en el escritorio: abre el juego en su consola.
+    set(CPACK_PACKAGE_EXECUTABLES "escape_circuit;Circuito de Escape")
+    set(CPACK_CREATE_DESKTOP_LINKS "escape_circuit")
+    set(CPACK_NSIS_DISPLAY_NAME "Circuito de Escape")
+    set(CPACK_NSIS_PACKAGE_NAME "Circuito de Escape ${PROJECT_VERSION}")
+    set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_MODIFY_PATH OFF)
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "escape_circuit.exe")
 else()
-    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_PACKAGE_FILE_NAME "escape-circuit-${PROJECT_VERSION}-linux-x86_64")
+    set(CPACK_GENERATOR "DEB;TGZ")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Equipo Dinamita - CS2013 UTEC")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "games")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
+        "Activa los interruptores A y B y escapa sin que te atrape el vigilante.\n\
+Incluye escape_circuit (juego) y map_generator (preparacion concurrente de mapas).")
+    if(CIRCUIT_ESCAPE_STATIC)
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "")  # ejecutables estaticos: sin dependencias
+    else()
+        set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    endif()
 endif()
 include(CPack)
 
