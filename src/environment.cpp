@@ -22,6 +22,7 @@ std::vector<std::string> readLines(
     std::string line;
 
     while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         lines.push_back(line);
     }
 
