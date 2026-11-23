@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <vector>
 #include <variant>
 
 namespace circuit_escape {
@@ -23,6 +24,9 @@ constexpr std::string_view kEmojiBattery = "\xF0\x9F\x94\x8B";
 constexpr std::string_view kEmojiTrap = "\xF0\x9F\x92\x80";
 constexpr std::string_view kEmojiExit = "\xF0\x9F\x9A\xAA";
 constexpr std::string_view kEmojiAgent = "\xF0\x9F\xA4\x96";
+constexpr std::string_view kEmojiGuard = "\xF0\x9F\x91\xBE";
+constexpr std::string_view kEmojiSwitchOff = "\xF0\x9F\x94\xB4";
+constexpr std::string_view kEmojiSwitchOn = "\xF0\x9F\x9F\xA2";
 
 std::optional<UiCommand> fromLetter(char letter) {
     switch (std::tolower(static_cast<unsigned char>(letter))) {
@@ -53,6 +57,17 @@ ftxui::Element cellBox(std::string label) {
     return ftxui::text(std::move(label)) | ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2);
 }
 
+UiOutcome resolve_command(const UiCommand& command, bool help_open, bool escape_pressed) noexcept {
+    return std::visit(
+        Overloaded{
+            [&](QuitCommand) {
+                return (help_open && escape_pressed) ? UiOutcome::close_help : UiOutcome::quit;
+            },
+            [&](HelpCommand) { return help_open ? UiOutcome::close_help : UiOutcome::open_help; },
+            [&](Action) { return help_open ? UiOutcome::close_help : UiOutcome::play_action; }},
+        command);
+}
+
 std::optional<UiCommand> ConsoleUI::translate(const ftxui::Event& event) const {
     if (event == ftxui::Event::ArrowUp) return UiCommand{Action::up};
     if (event == ftxui::Event::ArrowDown) return UiCommand{Action::down};
@@ -74,6 +89,45 @@ bool ConsoleUI::isKeyboardEvent(const ftxui::Event& event) {
 
 std::string ConsoleUI::emptyGlyph() const {
     return mode_ == RenderMode::ascii ? "." : std::string(kEmojiEmpty);
+}
+
+std::string ConsoleUI::guardGlyph() const {
+    return mode_ == RenderMode::ascii ? "G" : std::string(kEmojiGuard);
+}
+
+std::string ConsoleUI::switchGlyph(bool active) const {
+    if (mode_ == RenderMode::ascii) return active ? "+" : "!";
+    return std::string(active ? kEmojiSwitchOn : kEmojiSwitchOff);
+}
+
+std::string ConsoleUI::glyphAt(const NavigationEnvironment& environment, Position position) const {
+    if (environment.has_objectives()) {
+        if (position == environment.guard_position()) return guardGlyph();
+        if (position == environment.player_position()) return agentGlyph();
+        for (const SwitchId id : {SwitchId::a, SwitchId::b}) {
+            if (position == environment.switch_position(id)) {
+                return switchGlyph(environment.is_switch_active(id));
+            }
+        }
+    } else if (position == environment.player_position()) {
+        return agentGlyph();
+    }
+    return glyphFor(environment.grid().at(position));
+}
+
+std::string ConsoleUI::objectivesStatus(const NavigationEnvironment& environment) const {
+    if (!environment.has_objectives()) return "";
+    const auto state = [&](SwitchId id) {
+        return environment.is_switch_active(id) ? "activado" : "pendiente";
+    };
+    std::string text = std::string("A ") + state(SwitchId::a) + " | B " + state(SwitchId::b);
+    if (!environment.isFinished()) {
+        // Tras tu proximo movimiento el turno sera el numero turn()+1.
+        const bool guardMoves = (environment.turn() + 1) % 2 == 0;
+        text += guardMoves ? " | Vigilante: se mueve tras tu accion"
+                           : " | Vigilante: quieto este turno";
+    }
+    return text;
 }
 
 std::string ConsoleUI::agentGlyph() const {
@@ -148,15 +202,15 @@ std::string directionName(Action action) {
 int relevance(const NavigationEvent& event) {
     return std::visit(
         Overloaded{
-    [](const CapturedEvent&) { return 8; },
-    [](const GoalReachedEvent&) { return 6; },
-    [](const SwitchActivatedEvent&) { return 7; },
-    [](const TrapTriggeredEvent&) { return 5; },
-    [](const ResourceCollectedEvent&) { return 4; },
-    [](const EnergyChangedEvent& e) { return e.current > e.previous ? 3 : 0; },
-    [](const MovementRejectedEvent&) { return 2; },
-    [](const MovedEvent&) { return 1; },
-    [](const GuardMovedEvent&) { return 1; }},
+            [](const CapturedEvent&) { return 8; },
+            [](const GoalReachedEvent&) { return 6; },
+            [](const SwitchActivatedEvent&) { return 7; },
+            [](const TrapTriggeredEvent&) { return 5; },
+            [](const ResourceCollectedEvent&) { return 4; },
+            [](const EnergyChangedEvent& e) { return e.current > e.previous ? 3 : 0; },
+            [](const MovementRejectedEvent&) { return 2; },
+            [](const MovedEvent&) { return 1; },
+            [](const GuardMovedEvent&) { return 1; }},
         event);
 }
 
@@ -197,7 +251,8 @@ std::string ConsoleUI::lastEventText(std::span<const NavigationEvent> stepEvents
             [&](const MovedEvent& e) { return agentGlyph() + " en " + coordinates(e.to); },
             [&](const GuardMovedEvent& e) { return "vigilante en " + coordinates(e.to); },
             [&](const SwitchActivatedEvent& e) {
-                return std::string("interruptor ") + (e.id == SwitchId::a ? "A" : "B") + " activado en " + coordinates(e.at);
+                return std::string("interruptor ") + (e.id == SwitchId::a ? "A" : "B") +
+                       " activado en " + coordinates(e.at);
             },
             [&](const CapturedEvent& e) { return "capturado en " + coordinates(e.at); }},
         *headline);
@@ -230,7 +285,9 @@ ftxui::Element ConsoleUI::help() const {
                ftxui::text("D / flecha derecha   mover a la derecha"),
                ftxui::text("E                    esperar un turno"),
                ftxui::text("H                    mostrar u ocultar esta ayuda"),
-               ftxui::text("Q / Esc              abandonar la partida"),
+               ftxui::text("Esc                  cerrar la ayuda (con la ayuda cerrada, abandonar)"),
+               ftxui::text("Q                    abandonar la partida"),
+               ftxui::text("Con la ayuda abierta no pasa ningun turno."),
                ftxui::text(""),
                ftxui::text("Leyenda") | ftxui::bold,
                ftxui::hbox({cellBox(agentGlyph()), ftxui::text(" agente")}),
@@ -243,6 +300,31 @@ ftxui::Element ConsoleUI::help() const {
                ftxui::hbox({cellBox(glyphFor(Cell{Battery{}})), ftxui::text(" bateria")}),
                ftxui::hbox({cellBox(glyphFor(Cell{Trap{}})), ftxui::text(" trampa")}),
                ftxui::hbox({cellBox(glyphFor(Cell{Exit{}})), ftxui::text(" salida")}),
+               ftxui::hbox({cellBox(guardGlyph()), ftxui::text(" vigilante")}),
+               ftxui::hbox({cellBox(switchGlyph(false)), ftxui::text(" interruptor pendiente")}),
+               ftxui::hbox({cellBox(switchGlyph(true)), ftxui::text(" interruptor activado")}),
+           }) |
+           ftxui::border;
+}
+
+ftxui::Dimensions ConsoleUI::required_size(const NavigationEnvironment& environment) const {
+    const std::vector<NavigationEvent> noEvents;
+    auto document = render(environment, noEvents);
+    document->ComputeRequirement();
+    return ftxui::Dimensions{document->requirement().min_x, document->requirement().min_y};
+}
+
+ftxui::Element ConsoleUI::too_small_message(ftxui::Dimensions required,
+                                            ftxui::Dimensions actual) const {
+    const auto size = [](ftxui::Dimensions d) {
+        return std::to_string(d.dimx) + "x" + std::to_string(d.dimy);
+    };
+    return ftxui::vbox({
+               ftxui::text("Terminal demasiado pequena para este tablero.") | ftxui::bold,
+               ftxui::text("Se necesita al menos " + size(required) + " (columnas x filas)."),
+               ftxui::text("Tamano actual: " + size(actual) + "."),
+               ftxui::text("Amplie la ventana o elija un tablero menor."),
+               ftxui::text("Q para salir."),
            }) |
            ftxui::border;
 }
