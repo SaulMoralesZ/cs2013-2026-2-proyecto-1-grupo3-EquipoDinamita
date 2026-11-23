@@ -49,3 +49,8 @@ __pycache__/
 # Temporary files
 *.tmp
 *.log
+# Partidas guardadas por el jugador (escape_circuit, tecla G)
+saves/
+
+# Cache de clangd (VS Code)
+.cache/

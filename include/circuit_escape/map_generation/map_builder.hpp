@@ -8,7 +8,7 @@
 
 #include "../cells.hpp"
 #include "../game_rules.hpp"
-#include "../grid_runtime.hpp"
+#include "../grid.hpp"
 #include "../position.hpp"
 
 #include "map.hpp"

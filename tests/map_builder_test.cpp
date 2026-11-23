@@ -1,5 +1,7 @@
 #undef NDEBUG
 #include <cassert>
+#include <cstdio>
+#include <utility>
 #include <optional>
 #include <unordered_set>
 #include <stdexcept>
@@ -8,11 +10,12 @@
 
 #include "../include/circuit_escape/cells.hpp"
 #include "../include/circuit_escape/game_rules.hpp"
-#include "../include/circuit_escape/grid_runtime.hpp"
+#include "../include/circuit_escape/grid.hpp"
 #include "../include/circuit_escape/map_generation/map.hpp"
 #include "../include/circuit_escape/map_generation/map_builder.hpp"
 #include "../include/circuit_escape/map_io/scenario_format.hpp"
 #include "../include/circuit_escape/position.hpp"
+#include "../include/circuit_escape/environment.hpp"
 
 using namespace circuit_escape;
 
@@ -30,10 +33,10 @@ void validateDimensionsBasic() {
     assert(!MapBuilder::validateDimensions(40, 60).has_value());
     // Borde: max_side y max_side+1
     assert(!MapBuilder::validateDimensions(
-        static_cast<int>(RuntimeGrid::max_side),
-        static_cast<int>(RuntimeGrid::max_side)).has_value());
+        static_cast<int>(Grid<Cell>::max_side),
+        static_cast<int>(Grid<Cell>::max_side)).has_value());
     assert(MapBuilder::validateDimensions(
-        static_cast<int>(RuntimeGrid::max_side) + 1,
+        static_cast<int>(Grid<Cell>::max_side) + 1,
         5).has_value());
     // Demasiado pequenas
     assert(MapBuilder::validateDimensions(1, 1).has_value());
@@ -230,6 +233,70 @@ void saveLoadRoundTrip() {
     std::remove(path.c_str());
 }
 
+// Generar -> guardar -> cargar -> jugar en los tamanos de la seccion 7.
+void generatedMapsArePlayable() {
+    MapConfig config;
+    config.numResources = 3;
+    config.numBatteries = 2;
+    config.numTraps = 2;
+    const std::pair<int, int> sizes[] = {{10, 15}, {20, 30}, {40, 60}};
+    for (const auto& [rows, cols] : sizes) {
+        Map map = MapBuilder::buildMap(1, 7, rows, cols, config);
+        const std::string path = "test_map_playable.txt";
+        saveMap(map, path);
+        const Map loaded = loadMap(path);
+        std::remove(path.c_str());
+
+        assert(loaded.rules == map.rules);
+        for (std::size_t r = 0; r < map.grid.rows(); ++r)
+            for (std::size_t c = 0; c < map.grid.columns(); ++c)
+                assert(loaded.grid.at({r, c}).index() == map.grid.at({r, c}).index());
+
+        NavigationEnvironment env(to_scenario(loaded));  // valida objetivos
+        assert(env.has_objectives());
+        assert(env.grid().rows() == static_cast<std::size_t>(rows));
+        assert(env.grid().columns() == static_cast<std::size_t>(cols));
+        assert(env.goal() == loaded.exit);
+        assert(!env.is_switch_active(SwitchId::a) && !env.is_switch_active(SwitchId::b));
+        (void)env.step(Action::wait);
+        assert(env.turn() == 1);
+    }
+}
+
+// Kruskal: el arbol tiene (casillas base - 1) aperturas y es aciclico;
+// las adicionales se registran aparte y no se repiten.
+void kruskalTreeAndExtras() {
+    MapConfig config;
+    Map map = MapBuilder::buildMap(1, 42, 10, 15, config);
+    const std::size_t base = 5 * 8;  // filas pares 0..8, columnas pares 0..14
+    assert(map.tree_openings.size() == base - 1);
+    std::unordered_set<Position, PositionHash> tree(map.tree_openings.begin(),
+                                                    map.tree_openings.end());
+    for (Position p : map.extra_openings) assert(!tree.count(p));
+    assert(map.tree_cost > 0);
+
+    Map again = MapBuilder::buildMap(1, 42, 10, 15, config);
+    assert(again.tree_openings == map.tree_openings);
+    assert(again.extra_openings == map.extra_openings);
+    assert(again.tree_cost == map.tree_cost);
+}
+
+void deserializeRejectsBadInput() {
+    const auto throws = [](const std::string& text) {
+        try {
+            (void)deserialize(text);
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+    assert(throws("rows: 1\ncols: 3\n"));                 // sin grid
+    assert(throws("rows: 2\ncols: 3\ngrid:\n@.S\n"));   // rows no coincide
+    assert(throws("grid:\n@?S\n"));                       // simbolo desconocido
+    assert(throws("foo: 1\ngrid:\n@.S\n"));              // clave desconocida
+    assert(!throws("rows: 1\ncols: 3\ngrid:\n@.S\n"));
+}
+
 }  // namespace
 
 int main() {
@@ -241,6 +308,9 @@ int main() {
     actionConversion();
     winningPlaySerialization();
     toScenario();
+    generatedMapsArePlayable();
+    kruskalTreeAndExtras();
+    deserializeRejectsBadInput();
     saveLoadRoundTrip();
     return 0;
 }

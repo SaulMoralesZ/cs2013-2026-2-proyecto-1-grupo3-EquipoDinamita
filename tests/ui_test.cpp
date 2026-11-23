@@ -381,6 +381,57 @@ void tamanoNecesarioSegunElTablero() {
     assert(ConsoleUI(RenderMode::ascii).required_size(conVigilante).dimy == 4 + 3 + 1);
 }
 
+// Zoom del tablero: cada casilla ocupa 2*zoom columnas y zoom filas.
+void elZoomAgrandaElTablero() {
+    std::vector<std::string> lineas(20, std::string(30, '.'));
+    lineas[0][0] = '@';
+    lineas[19][29] = 'S';
+    const auto medio = parseScenario(lineas);
+    const NavigationEnvironment m(medio.grid, medio.start);
+    for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
+        ConsoleUI ui(modo);
+        assert(ui.zoom() == 1);
+        for (int z = 1; z <= ConsoleUI::max_zoom; ++z) {
+            ui.setZoom(z);
+            const auto tamano = ui.required_size(m);
+            assert(tamano.dimx == 2 * z * (30 + 1));
+            assert(tamano.dimy == 20 * z + 3);
+        }
+        ui.setZoom(0);
+        assert(ui.zoom() == 1);
+        ui.setZoom(99);
+        assert(ui.zoom() == ConsoleUI::max_zoom);
+    }
+}
+
+// El marco de la partida no cambia de tamano aunque cambien los textos: asi,
+// centrado en la pantalla, no se desplaza al moverse el jugador.
+void elMarcoDeLaPartidaTieneTamanoFijo() {
+    const auto medida = [](const ftxui::Element& e) {
+        e->ComputeRequirement();
+        return std::pair{e->requirement().min_x, e->requirement().min_y};
+    };
+    for (const RenderMode modo : {RenderMode::ascii, RenderMode::emoji}) {
+        for (int z = 1; z <= 3; ++z) {
+            ConsoleUI ui(modo);
+            ui.setZoom(z);
+            NavigationEnvironment e(escenarioConVigilante());
+            const std::vector<NavigationEvent> nada;
+            const auto base = medida(ui.game_frame(e, nada, "Titulo", "teclas", ""));
+            const std::string largo(300, 'x');  // aviso que ocupa mas de dos lineas
+            assert(medida(ui.game_frame(e, nada, "Otro titulo mas largo", "teclas", largo)) == base);
+            assert(medida(ui.game_frame(e, nada, "Titulo", largo, "corto")) == base);
+            for (Action a : {Action::right, Action::wait, Action::up, Action::left, Action::down}) {
+                if (e.isFinished()) break;
+                const auto paso = e.step(a);
+                assert(medida(ui.game_frame(e, paso.events, "Titulo", "teclas", "aviso")) == base);
+            }
+            // Ancho minimo para que entren las lineas de estado.
+            assert(base.first >= ConsoleUI::frame_min_width);
+        }
+    }
+}
+
 void elMensajeDeTerminalPequenaDiceCuantoHaceFalta() {
     const ConsoleUI ui(RenderMode::ascii);
     auto mensaje = ui.too_small_message(ftxui::Dimensions{122, 43}, ftxui::Dimensions{80, 24});
@@ -430,6 +481,8 @@ int main() {
     laBarraIndicaCuandoSeMueveElVigilante();
     sinVigilanteLaVistaNoCambia();
     tamanoNecesarioSegunElTablero();
+    elZoomAgrandaElTablero();
+    elMarcoDeLaPartidaTieneTamanoFijo();
     elMensajeDeTerminalPequenaDiceCuantoHaceFalta();
     laAyudaListaVigilanteEInterruptores();
     return 0;

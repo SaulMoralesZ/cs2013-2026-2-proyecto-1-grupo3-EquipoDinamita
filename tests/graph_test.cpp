@@ -7,7 +7,7 @@
 #include "../include/circuit_escape/cells.hpp"
 #include "../include/circuit_escape/graph/disjoint_set.hpp"
 #include "../include/circuit_escape/graph/graph.hpp"
-#include "../include/circuit_escape/grid_runtime.hpp"
+#include "../include/circuit_escape/grid.hpp"
 #include "../include/circuit_escape/position.hpp"
 
 using namespace circuit_escape;
@@ -38,7 +38,7 @@ void disjointSetBasic() {
 
 void graphFromGrid() {
     // Grid 3x3: centro libre, resto paredes
-    RuntimeGrid grid(3, 3);
+    Grid<Cell> grid(3, 3);
     for (std::size_t r = 0; r < 3; ++r)
         for (std::size_t c = 0; c < 3; ++c)
             grid.at({r, c}) = Wall{};
@@ -49,7 +49,7 @@ void graphFromGrid() {
     assert(g.neighbors({1, 1}).empty());
 
     // Grid 3x3: todos libres
-    RuntimeGrid grid2(3, 3);
+    Grid<Cell> grid2(3, 3);
     for (std::size_t r = 0; r < 3; ++r)
         for (std::size_t c = 0; c < 3; ++c)
             grid2.at({r, c}) = Empty{};
@@ -66,7 +66,7 @@ void graphFromGrid() {
 
 void graphRespectsWalls() {
     // Grid con un muro en el centro
-    RuntimeGrid grid(3, 3);
+    Grid<Cell> grid(3, 3);
     for (std::size_t r = 0; r < 3; ++r)
         for (std::size_t c = 0; c < 3; ++c)
             grid.at({r, c}) = Empty{};
@@ -82,7 +82,7 @@ void graphRespectsWalls() {
 }
 
 void graphIndexOf() {
-    RuntimeGrid grid(2, 2);
+    Grid<Cell> grid(2, 2);
     for (std::size_t r = 0; r < 2; ++r)
         for (std::size_t c = 0; c < 2; ++c)
             grid.at({r, c}) = Empty{};

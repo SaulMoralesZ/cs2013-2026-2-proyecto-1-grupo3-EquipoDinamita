@@ -13,9 +13,11 @@
 #include <vector>
 
 #include "./cells.hpp"
+#include "./entry_cost.hpp"
 #include "./game_rules.hpp"
 #include "./grid.hpp"
 #include "./events.hpp"
+#include "./scenario.hpp"
 
 namespace circuit_escape {
 
@@ -44,29 +46,7 @@ template<typename... Checks>
     return result;
 }
 
-// ------------------------------------------------------ Costo de entrada
-// Costo de energía de entrar a una celda. Lo usan el motor, Dijkstra y la
-// ayuda H, para que preparación, ayuda y juego coincidan. Solo cuentan la
-// casilla base y la áspera; las recargas no son pesos negativos.
-[[nodiscard]] inline int entry_cost(const Cell& cell, const GameRules& rules) {
-    return std::visit(
-        Overloaded{
-            [&](const RoughTerrain&) { return rules.roughCost; },
-            [&](const auto&) { return rules.baseCost; }},
-        cell);
-}
 
-
-// --------------------------------------------------------- Escenario
-//Escenario completo de una partida. La salida no es un campo: el motor la encuentra como la única celda Exit del Grid
-struct Scenario {
-    Grid<Cell> grid;
-    Position start{};
-    Position switch_a{};
-    Position switch_b{};
-    Position guard_start{};
-    GameRules rules{};
-};
 
 // Lo que describe un archivo de texto del Proyecto 1: tablero y posición inicial ('@'), sin interruptores ni vigilante
 struct BoardLayout {

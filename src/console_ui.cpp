@@ -173,11 +173,22 @@ ftxui::Element ConsoleUI::statusBar(const Observation& state, std::size_t totalR
     return ftxui::text(text) | ftxui::bold;
 }
 
+ftxui::Element ConsoleUI::tile(std::string label, bool wall) const {
+    if (zoom_ == 1) return cellBox(std::move(label));
+    // Casilla ampliada: el simbolo centrado en un bloque de 2z x z.
+    auto element = ftxui::text(std::move(label)) | ftxui::center |
+                   ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2 * zoom_) |
+                   ftxui::size(ftxui::HEIGHT, ftxui::EQUAL, zoom_);
+    if (wall) element = element | ftxui::bgcolor(ftxui::Color::GrayDark);
+    return element;
+}
+
 ftxui::Element ConsoleUI::horizontalRuler(std::size_t columns) const {
     ftxui::Elements labels;
-    labels.push_back(cellBox(emptyGlyph()));
+    labels.push_back(cellBox(emptyGlyph()) | ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2 * zoom_));
     for (std::size_t column = 0; column < columns; ++column) {
-        labels.push_back(cellBox(coordinateLabel(column)));
+        labels.push_back(cellBox(coordinateLabel(column)) | ftxui::hcenter |
+                         ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2 * zoom_));
     }
     return ftxui::hbox(std::move(labels));
 }
@@ -275,6 +286,165 @@ ftxui::Element ConsoleUI::notice(const std::string& text) const {
     return ftxui::text(text) | ftxui::inverted;
 }
 
+ftxui::Element ConsoleUI::board(const NavigationEnvironment& environment,
+                                std::span<const Position> highlight) const {
+    const auto& grid = environment.grid();
+    std::vector<bool> marked(grid.rows() * grid.columns(), false);
+    for (Position p : highlight) {
+        if (grid.contains(p)) marked[p.row * grid.columns() + p.column] = true;
+    }
+
+    ftxui::Elements lines;
+    lines.push_back(horizontalRuler(grid.columns()));
+    for (std::size_t row = 0; row < grid.rows(); ++row) {
+        ftxui::Elements cells;
+        cells.push_back(cellBox(coordinateLabel(row)) | ftxui::vcenter |
+                        ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2 * zoom_) |
+                        ftxui::size(ftxui::HEIGHT, ftxui::EQUAL, zoom_));
+        for (std::size_t column = 0; column < grid.columns(); ++column) {
+            const Position position{row, column};
+            auto cell = tile(glyphAt(environment, position),
+                             std::holds_alternative<Wall>(grid.at(position)));
+            if (marked[row * grid.columns() + column]) {
+                cell = cell | ftxui::bgcolor(ftxui::Color::Blue) | ftxui::bold;
+            }
+            cells.push_back(std::move(cell));
+        }
+        lines.push_back(ftxui::hbox(std::move(cells)));
+    }
+    return ftxui::vbox(std::move(lines));
+}
+
+ftxui::Element ConsoleUI::game_frame(const NavigationEnvironment& environment,
+                                    std::span<const NavigationEvent> recentEvents,
+                                    const std::string& title, const std::string& keys,
+                                    const std::string& notice,
+                                    std::span<const Position> highlight) const {
+    auto boardView = board(environment, highlight);
+    boardView->ComputeRequirement();
+    const int width = std::max(boardView->requirement().min_x, frame_min_width);
+
+    // Cada linea ocupa exactamente `width` columnas (se rellena o se recorta).
+    const auto line = [width](ftxui::Element element) {
+        return element | ftxui::size(ftxui::WIDTH, ftxui::EQUAL, width);
+    };
+    const Observation state = environment.state();
+    std::string status = "Turno " + std::to_string(state.turn) + "/" +
+                         std::to_string(environment.rules().turnLimit) + " | Energia " +
+                         std::to_string(state.energy) + "/" + std::to_string(state.maximumEnergy) +
+                         " | Puntaje " + std::to_string(state.score) + " | Recursos " +
+                         std::to_string(state.collectedResources) + "/" +
+                         std::to_string(environment.totalResources());
+
+    ftxui::Elements rows;
+    rows.push_back(line(ftxui::text(status) | ftxui::bold));
+    // La linea de objetivos existe siempre (vacia en mapas sin interruptores).
+    rows.push_back(line(ftxui::text(objectivesStatus(environment)) | ftxui::bold));
+    rows.push_back(ftxui::separator());
+    rows.push_back(line(std::move(boardView) | ftxui::hcenter));
+    rows.push_back(ftxui::separator());
+    std::string last = "Ultimo: " + lastEventText(recentEvents);
+    if (environment.endReason() != EndReason::none) {
+        last += " | Fin: " + toString(environment.endReason());
+    }
+    rows.push_back(line(ftxui::text(last)));
+    rows.push_back(line(ftxui::text(keys) | ftxui::dim));
+    // Aviso: dos lineas reservadas aunque este vacio.
+    auto message = notice.empty() ? ftxui::text("") : ftxui::paragraph(notice) | ftxui::inverted;
+    rows.push_back(line(std::move(message) | ftxui::size(ftxui::HEIGHT, ftxui::EQUAL, 2)));
+
+    return ftxui::window(ftxui::text(" " + title + " ") | ftxui::bold, ftxui::vbox(std::move(rows)));
+}
+
+ftxui::Element ConsoleUI::help_screen(const NavigationEnvironment& environment,
+                                      const EnergyHelp& energyHelp,
+                                      HelpHighlight highlight) const {
+    ftxui::Elements panel;
+    panel.push_back(ftxui::text("Ayuda de energia (Dijkstra) - turno " +
+                                std::to_string(energyHelp.turn)) |
+                    ftxui::bold);
+    panel.push_back(ftxui::text(""));
+    for (const std::string& line : format_energy_help(energyHelp)) {
+        panel.push_back(ftxui::text(line));
+    }
+    panel.push_back(ftxui::text(""));
+    panel.push_back(ftxui::text("No anticipa al vigilante ni las recargas: los desvios y") |
+                    ftxui::dim);
+    panel.push_back(ftxui::text("esperas gastan mas. No garantiza un escape seguro.") |
+                    ftxui::dim);
+    panel.push_back(ftxui::text(""));
+
+    const char* names[] = {"recorrido completo", "camino hacia A", "camino hacia B"};
+    const auto index = static_cast<std::size_t>(highlight);
+    std::string shown = std::string("Resaltado: ") + names[index];
+    if (energyHelp.path(highlight).empty()) shown += " (no aplica)";
+    panel.push_back(ftxui::text(shown) | ftxui::color(ftxui::Color::Blue) | ftxui::bold);
+    panel.push_back(ftxui::text("1 hacia A | 2 hacia B | 3 recorrido | H o Esc volver") |
+                    ftxui::dim);
+
+    return ftxui::vbox({
+        ftxui::hbox({ftxui::vbox(std::move(panel)) | ftxui::border, help()}),
+        board(environment, energyHelp.path(highlight)),
+    });
+}
+
+ftxui::Element ConsoleUI::menu(const std::string& title, std::span<const MenuEntry> entries,
+                               std::size_t selected, const std::string& hint) const {
+    const std::string marker = mode_ == RenderMode::ascii ? "> " : "\xE2\x96\xB6 ";
+    ftxui::Elements rows;
+    rows.push_back(ftxui::text(title) | ftxui::bold | ftxui::center);
+    rows.push_back(ftxui::separator());
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+        const MenuEntry& entry = entries[i];
+        const bool current = i == selected;
+        auto label = ftxui::text((current ? marker : std::string("  ")) + entry.label);
+        if (current) label = label | ftxui::bold | ftxui::inverted;
+        if (!entry.enabled) label = label | ftxui::dim;
+        ftxui::Elements line{label};
+        if (!entry.detail.empty()) {
+            line.push_back(ftxui::text("   " + entry.detail) | ftxui::dim);
+        }
+        rows.push_back(ftxui::hbox(std::move(line)));
+    }
+    rows.push_back(ftxui::separator());
+    rows.push_back(ftxui::text(hint) | ftxui::dim);
+    return ftxui::vbox(std::move(rows)) | ftxui::border | ftxui::center;
+}
+
+ftxui::Element ConsoleUI::how_to_play() const {
+    const auto line = [](const std::string& text) { return ftxui::text(text); };
+    auto rules = ftxui::vbox({
+        ftxui::text("Como jugar") | ftxui::bold,
+        line(""),
+        line("Objetivo: activa los interruptores A y B, en cualquier orden, y"),
+        line("despues llega a la salida con energia restante, sin ser capturado"),
+        line("y dentro del limite de turnos."),
+        line(""),
+        line("- Pisar un interruptor lo activa y queda activado."),
+        line("- La salida se puede pisar antes, pero solo sirve con A y B activos."),
+        line("- Cada movimiento cuesta la energia de la casilla a la que entras;"),
+        line("  el terreno elevado cuesta mas. Esperar o chocar cuesta 1."),
+        line("- Las baterias recargan energia; las trampas la quitan."),
+        line("- Los recursos dan puntos (no son necesarios para ganar)."),
+        line("- El vigilante te persigue por el camino mas corto (BFS)."),
+        line("  Se mueve en los turnos PARES. Si te alcanza, pierdes, aunque"),
+        line("  estes en la salida."),
+        line("- Con energia 0 pierdes; llegar a la salida con 0 no gana."),
+        line(""),
+        line("Durante la partida, H abre la ayuda de energia (Dijkstra):"),
+        line("gasto hacia A, B y la salida, recorrido sugerido y saldo."),
+        line("Mientras esta abierta no pasa ningun turno."),
+        line(""),
+        line("R reinicia la partida | M vuelve al menu"),
+        line("Al terminar, G guarda la partida para verla en el menu."),
+        line("El tablero se agranda solo segun la ventana; + y - lo ajustan."),
+        line("Para agrandar tambien el texto, use el zoom de la terminal (Ctrl +)."),
+        line(""),
+        ftxui::text("Enter, Esc o Q para volver") | ftxui::dim,
+    }) | ftxui::border;
+    return ftxui::hbox({rules, help()}) | ftxui::center;
+}
+
 ftxui::Element ConsoleUI::help() const {
     return ftxui::vbox({
                ftxui::text("Circuito de Escape - ayuda") | ftxui::bold,
@@ -288,6 +458,10 @@ ftxui::Element ConsoleUI::help() const {
                ftxui::text("Esc                  cerrar la ayuda (con la ayuda cerrada, abandonar)"),
                ftxui::text("Q                    abandonar la partida"),
                ftxui::text("Con la ayuda abierta no pasa ningun turno."),
+               ftxui::text("1 / 2 / 3            resaltar camino a A / a B / recorrido"),
+               ftxui::text("R                    reiniciar la partida"),
+               ftxui::text("G                    guardar la partida (al terminar)"),
+               ftxui::text("+ / -                agrandar / achicar el tablero"),
                ftxui::text(""),
                ftxui::text("Leyenda") | ftxui::bold,
                ftxui::hbox({cellBox(agentGlyph()), ftxui::text(" agente")}),

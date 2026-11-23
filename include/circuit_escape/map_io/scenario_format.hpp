@@ -7,24 +7,14 @@
 
 #include "../cells.hpp"
 #include "../game_rules.hpp"
-#include "../grid_runtime.hpp"
+#include "../grid.hpp"
 #include "../position.hpp"
 #include "../map_generation/map.hpp"
+#include "../scenario.hpp"
 
 namespace circuit_escape {
 
-// Scenario shim: coincide con la API prometida por Treicy (Bloque 1).
-// Cuando Treicy entregue su Scenario real, este se reemplaza.
-struct Scenario {
-    RuntimeGrid grid{1, 1};
-    Position start{};
-    Position switch_a{};
-    Position switch_b{};
-    Position guard_start{};
-    GameRules rules{};
-};
-
-// Convierte un Map (de Miguel) a un Scenario (de Treicy).
+// Convierte un Map (generado o cargado) al Scenario que consume el motor.
 // Copia campos: grid, start, switch_a, switch_b, guard_start (vigilanteStart),
 // rules. La salida no es campo: el motor la busca como la unica celda Exit.
 Scenario to_scenario(const Map& map);

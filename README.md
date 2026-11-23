@@ -118,7 +118,7 @@ cmake --build build --config Release
 ### CLion
 
 1. Abrir la carpeta del repositorio (CLion detecta `CMakeLists.txt`).
-2. *Run → Edit Configurations → navigation_game → Working directory* = `$ProjectFileDir$`
+2. *Run → Edit Configurations → escape_circuit → Working directory* = `$ProjectFileDir$`
    (el juego busca los mapas en `assets/maps/` relativo a la carpeta de trabajo).
 3. Compilar con *Build → Build Project*. La carpeta de compilación es `cmake-build-debug/`.
 ### Solo el motor, sin interfaz
@@ -167,15 +167,17 @@ Siempre desde la **raíz del repositorio**:
 
 | Sistema | Comando |
 |---|---|
-| Linux / macOS | `./build/navigation_game` |
-| PowerShell | `.\build\navigation_game.exe` |
-| Command Prompt | `build\navigation_game.exe` |
+| Linux / macOS | `./build/escape_circuit` |
+| PowerShell | `.\build\escape_circuit.exe` |
+| Command Prompt | `build\escape_circuit.exe` |
 
 ### Opciones
 
 | Opción | Descripción | Valor por defecto |
 |---|---|---|
-| `--scenario <ruta>` | mapa a cargar | `assets/maps/scenario_01.txt` |
+| `--level facil\|medio\|dificil` | juega `assets/maps/mapa_<nivel>.txt` | — |
+| `--map <ruta>` | escenario del Proyecto 2 (A, B y vigilante; reglas del archivo) | — |
+| `--scenario <ruta>` | mapa del Proyecto 1, sin interruptores | `assets/maps/scenario_01.txt` |
 | `--difficulty easy\|standard\|hard` | perfil de reglas | `standard` |
 | `--ascii` | presentación sin emojis | modo emoji |
 | `--controller random\|heuristic` | juega una política automática | jugador humano |
@@ -186,20 +188,24 @@ Siempre desde la **raíz del repositorio**:
 ### Ejemplos
 
 ```bash
-# Partida humana estándar con emojis
-./build/navigation_game
+# Preparar un lote (Kruskal + Dijkstra + victoria comprobada) y jugar un nivel
+./build/map_generator --rows 20 --cols 30 --seed 42 --energy 150 --turns 300
+./build/escape_circuit --level medio
+
+# Partida humana estándar con emojis (mapa del Proyecto 1)
+./build/escape_circuit
  
 # Partida difícil en el segundo escenario
-./build/navigation_game --difficulty hard --scenario assets/maps/scenario_02.txt
+./build/escape_circuit --difficulty hard --scenario assets/maps/scenario_02.txt
  
 # Terminal sin soporte de emojis
-./build/navigation_game --ascii
+./build/escape_circuit --ascii
  
 # Controlador heurístico
-./build/navigation_game --controller heuristic
+./build/escape_circuit --controller heuristic
  
 # Controlador aleatorio reproducible: la misma semilla produce la misma partida
-./build/navigation_game --controller random --seed 7
+./build/escape_circuit --controller random --seed 7
 ```
 
 En modo `--controller`, cada tecla de juego (WASD, flechas o E) avanza un turno del
@@ -312,6 +318,12 @@ energy_max: 80
 turn_limit: 240
 base_cost: 1
 rough_cost: 2
+wait_cost: 1
+invalid_cost: 1
+resource_points: 10
+battery_recharge: 3
+trap_energy_penalty: 2
+trap_score_penalty: 1
 min_cost: 10
 start: 0 1
 switch_a: 2 3
@@ -333,7 +345,10 @@ grid:
 - `level`: nivel de dificultad (`easy`, `standard`, `hard`).
 - `energy_initial`, `energy_max`: energía inicial y máxima del jugador.
 - `turn_limit`: límite de turnos.
-- `base_cost`, `rough_cost`: costos de terreno.
+- `base_cost`, `rough_cost`: costo de entrar a una casilla normal / de terreno elevado.
+- `wait_cost`, `invalid_cost`: energía de esperar / de un movimiento inválido.
+- `resource_points`, `battery_recharge`: puntos de cada recurso y energía de cada batería.
+- `trap_energy_penalty`, `trap_score_penalty`: energía y puntos que quita una trampa.
 - `min_cost`: costo mínimo calculado con Dijkstra.
 - `start`, `switch_a`, `switch_b`, `exit`, `vigilante`: posiciones (fila columna).
 - `winning_play`: lista de acciones del jugador que gana la partida (`U` arriba, `D` abajo,
@@ -341,6 +356,10 @@ grid:
   Vacío significa "sin victoria comprobada" (ese mapa no se habilita como nivel).
 - `grid`: cuadrícula con los símbolos de celda del proyecto 1 (`#`, `.`, `~`, `R`, `B`, `T`,
   `S`, `@`).
+
+Al cargar se rechaza (con mensaje claro) una clave desconocida, un símbolo de celda
+desconocido, filas de distinto ancho o `rows`/`cols` que no coincidan con la cuadrícula.
+Las líneas que empiezan con `#` antes de `grid:` son comentarios.
 
 **Reutilización:** la conversión `char → Cell` reutiliza `cellFromChar` del proyecto 1.
 La conversión `Action ↔ char` se hace con `action_to_char` / `char_to_action`

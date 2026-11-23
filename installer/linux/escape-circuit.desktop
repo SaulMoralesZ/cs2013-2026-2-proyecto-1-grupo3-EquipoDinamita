@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Circuito de Escape
+GenericName=Juego de laberinto por turnos
+Comment=Activa los interruptores A y B y escapa sin que te atrape el vigilante
+# El juego se abre en su propia terminal (terminal_launcher): no hace falta Terminal=true.
+Exec=escape_circuit
+Icon=escape-circuit
+Terminal=false
+Categories=Game;LogicGame;
+Keywords=laberinto;puzzle;turnos;dijkstra;
+StartupNotify=false

@@ -1,0 +1,34 @@
+rows: 10
+cols: 15
+id: 3
+seed: 44
+level: easy
+min_cost: 22
+energy_initial: 60
+energy_max: 60
+turn_limit: 180
+base_cost: 1
+rough_cost: 2
+wait_cost: 1
+invalid_cost: 1
+resource_points: 10
+battery_recharge: 3
+trap_energy_penalty: 2
+trap_score_penalty: 1
+start: 4 4
+switch_a: 5 0
+switch_b: 3 6
+exit: 2 2
+vigilante: 4 9
+winning_play: RRUDLLUULLLLDDDUUURR
+grid:
+.T.#..~..B.#.~.
+T#########.###R
+..S.B#~#.#....~
+~#R#.#.#.###.#.
+.#.#@..#...#~..
+.#######.#####.
+..~..R~#....~#.
+.###.#.#.#.###.
+.#..~..~.#...~.
+###############

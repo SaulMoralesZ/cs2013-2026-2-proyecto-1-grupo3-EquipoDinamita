@@ -11,19 +11,42 @@
 
 namespace circuit_escape {
 
+namespace {
+
+// Casillas transitables que deja Kruskal en una cuadricula rows x cols:
+// las casillas base (filas y columnas pares) mas las aperturas del arbol.
+std::size_t tree_traversable_cells(std::size_t rows, std::size_t cols) {
+    const std::size_t base = ((rows + 1) / 2) * ((cols + 1) / 2);
+    return base == 0 ? 0 : 2 * base - 1;
+}
+
+// Fisher-Yates propio: std::shuffle depende de la implementacion de la
+// biblioteca estandar y la misma semilla daria mapas distintos segun el
+// compilador. La salida de std::mt19937 si esta fijada por el estandar.
+template<typename T>
+void portable_shuffle(std::vector<T>& values, std::mt19937& rng) {
+    for (std::size_t i = values.size(); i > 1; --i) {
+        const std::size_t j = static_cast<std::size_t>(rng() % i);
+        std::swap(values[i - 1], values[j]);
+    }
+}
+
+}  // namespace
+
 std::optional<std::string> MapBuilder::validateDimensions(int rows, int cols) {
     if (rows <= 0 || cols <= 0) {
         return "Dimensiones invalidas: filas y columnas deben ser positivas.";
     }
     // Reutilizar max_side de Grid (Treicy), usar por nombre.
-    if (static_cast<std::size_t>(rows) > RuntimeGrid::max_side ||
-        static_cast<std::size_t>(cols) > RuntimeGrid::max_side) {
+    if (static_cast<std::size_t>(rows) > Grid<Cell>::max_side ||
+        static_cast<std::size_t>(cols) > Grid<Cell>::max_side) {
         return "Dimensiones exceden el maximo permitido (" +
-               std::to_string(RuntimeGrid::max_side) + ").";
+               std::to_string(Grid<Cell>::max_side) + ").";
     }
     // Necesitamos al menos espacio para 5 elementos (inicio, A, B, salida, vigilante)
     // en casillas transitables. Una grilla muy pequena no puede contenerlos.
-    if (rows * cols < 5) {
+    if (tree_traversable_cells(static_cast<std::size_t>(rows),
+                               static_cast<std::size_t>(cols)) < 5) {
         return "Dimensiones demasiado pequenas: se necesitan al menos 5 casillas transitables.";
     }
     return std::nullopt;
@@ -41,7 +64,7 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
     map.seed = seed;
 
     // Crear grid de dimensiones dadas, todo muros.
-    RuntimeGrid grid(static_cast<std::size_t>(rows), static_cast<std::size_t>(cols));
+    Grid<Cell> grid(static_cast<std::size_t>(rows), static_cast<std::size_t>(cols));
     for (std::size_t r = 0; r < grid.rows(); ++r) {
         for (std::size_t c = 0; c < grid.columns(); ++c) {
             grid.at({r, c}) = Wall{};
@@ -68,6 +91,7 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
     struct Opening {
         Position wall;
         int value;
+        std::size_t order;  // desempate fijo entre valores iguales
     };
     std::vector<Opening> openings;
     std::mt19937 rng(seed);
@@ -82,7 +106,7 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
                 std::holds_alternative<Empty>(grid.at(left)) &&
                 std::holds_alternative<Empty>(grid.at(right)) &&
                 std::holds_alternative<Wall>(grid.at(wall))) {
-                openings.push_back({wall, static_cast<int>(rng())});
+                openings.push_back({wall, static_cast<int>(rng() % 1000000u) + 1, openings.size()});
             }
         }
     }
@@ -97,21 +121,17 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
                 std::holds_alternative<Empty>(grid.at(up)) &&
                 std::holds_alternative<Empty>(grid.at(down)) &&
                 std::holds_alternative<Wall>(grid.at(wall))) {
-                openings.push_back({wall, static_cast<int>(rng())});
+                openings.push_back({wall, static_cast<int>(rng() % 1000000u) + 1, openings.size()});
             }
         }
     }
 
-    // Paso 3: Asignar valor positivo al azar (ya hecho arriba con rng()).
-    // Asegurar valores positivos.
-    for (auto& o : openings) {
-        if (o.value <= 0) o.value = 1;
-    }
-
+    // Paso 3: cada apertura ya tiene un valor positivo al azar (1..1000000).
     // Paso 4: Kruskal - ordenar aperturas de menor a mayor valor.
     std::sort(openings.begin(), openings.end(),
               [](const Opening& a, const Opening& b) {
-                  return a.value < b.value;
+                  if (a.value != b.value) return a.value < b.value;
+                  return a.order < b.order;
               });
 
     // DisjointSet para las casillas libres.
@@ -148,6 +168,8 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
             if (ds.unionSets(it1->second, it2->second)) {
                 // Remover el muro (convertir a Empty)
                 grid.at(opening.wall) = Empty{};
+                map.tree_openings.push_back(opening.wall);
+                map.tree_cost += opening.value;
             }
         }
     }
@@ -160,10 +182,11 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
             remaining.push_back(o);
         }
     }
-    std::shuffle(remaining.begin(), remaining.end(), rng);
+    portable_shuffle(remaining, rng);
     std::size_t extra = remaining.size() / 10;
     for (std::size_t i = 0; i < extra && i < remaining.size(); ++i) {
         grid.at(remaining[i].wall) = Empty{};
+        map.extra_openings.push_back(remaining[i].wall);
     }
 
     // Colocar elementos: inicio, A, B, salida, vigilante.
@@ -178,12 +201,18 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
         }
     }
 
-    if (traversable.size() < 5) {
-        throw std::invalid_argument("No hay suficientes casillas transitables para colocar los elementos.");
+    const std::size_t needed = 5 + static_cast<std::size_t>(std::max(0, config.numResources)) +
+                               static_cast<std::size_t>(std::max(0, config.numBatteries)) +
+                               static_cast<std::size_t>(std::max(0, config.numTraps));
+    if (traversable.size() < needed) {
+        throw std::invalid_argument(
+            "No hay suficientes casillas transitables para colocar los elementos (" +
+            std::to_string(traversable.size()) + " disponibles, " + std::to_string(needed) +
+            " necesarias).");
     }
 
     // Seleccionar 5 casillas distintas para inicio, A, B, salida, vigilante.
-    std::shuffle(traversable.begin(), traversable.end(), rng);
+    portable_shuffle(traversable, rng);
     Position startPos = traversable[0];
     Position switchA = traversable[1];
     Position switchB = traversable[2];
@@ -243,6 +272,8 @@ Map MapBuilder::buildMap(int mapId, unsigned seed, int rows, int cols,
 
     // Construir GameRules desde MapConfig.
     GameRules rules;
+    rules.waitCost = config.waitCost;
+    rules.invalidCost = config.invalidCost;
     rules.initialEnergy = config.energyInitial;
     rules.maximumEnergy = config.energyMax;
     rules.turnLimit = config.turnLimit;
