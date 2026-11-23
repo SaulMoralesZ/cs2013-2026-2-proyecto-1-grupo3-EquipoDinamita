@@ -188,7 +188,8 @@ public:
 
     [[nodiscard]] Observation state() const {
         return Observation{agent_, goal_, energy_, rules_.maximumEnergy, score_,
-                           collected_, turn_, availableActions()};
+                           collected_, turn_, availableActions(),
+                           &grid_, switch_a_active_, switch_b_active_, guard_};
     }
 
     [[nodiscard]] std::vector<Action> availableActions() const {
