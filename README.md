@@ -108,6 +108,35 @@ Para "desinstalar", basta con borrar la carpeta.
 
 El `LEEME.txt` incluido resume el uso. Los datos del usuario van en `%APPDATA%\escape_circuit\`.
 
+### Sin instalar: compilar y jugar desde el repositorio
+
+Para usar todo desde la terminal, incluido generar mapas propios. Se ejecuta en la raíz del
+repositorio clonado y requiere CMake y un compilador C++20 ([sección 3](#3-compilar-desde-el-código)).
+
+```bash
+# 1. Compilar
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release -j8
+
+# 2. (Opcional) Ejecutar las 20 pruebas
+ctest --test-dir build-release
+
+# 3. Generar un lote propio en otra carpeta (no sobrescribe assets/maps)
+./build-release/map_generator --rows 20 --cols 30 --energy 150 --turns 300 --seed 7 --out mis_mapas
+
+# 4. Jugar con esos mapas (menú) o directo en un nivel
+./build-release/escape_circuit --maps-dir mis_mapas
+./build-release/escape_circuit --maps-dir mis_mapas --level dificil
+
+# Sin el paso 3, el juego usa los mapas incluidos en assets/maps
+./build-release/escape_circuit
+```
+
+Si el generador avisa que el lote no tiene tres costos distintos, repetir con otra `--seed`.
+Las opciones completas están en las secciones [5](#5-preparar-mapas-map_generator-y-semillas)
+y [6](#6-opciones-de-escape_circuit). Para "desinstalar", basta con borrar `build-release/` y
+`mis_mapas/`.
+
 ### Doble clic: el juego abre su propia terminal
 
 - **Linux:** si se abre sin terminal (menú de aplicaciones o gestor de archivos), el juego se
