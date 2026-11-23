@@ -41,6 +41,9 @@ std::string toString(EndReason reason) {
 
         case EndReason::turnLimit:
             return "limite de turnos";
+
+        case EndReason::captured:
+            return "capturado por el vigilante";
     }
 
     return "desconocido";
@@ -87,6 +90,23 @@ std::string describe(const NavigationEvent& event) {
             else if constexpr (
                 std::is_same_v<T, GoalReachedEvent>) {
                 return "Salida alcanzada";
+            }
+
+            else if constexpr (
+                std::is_same_v<T, GuardMovedEvent>) {
+                return "Vigilante: " + toString(e.from) +
+                       " -> " + toString(e.to);
+            }
+
+            else if constexpr (
+                std::is_same_v<T, SwitchActivatedEvent>) {
+                return std::string("Interruptor ") + (e.id == SwitchId::a ? "A" : "B") +
+                       " activado en " + toString(e.at);
+            }
+
+            else if constexpr (
+                std::is_same_v<T, CapturedEvent>) {
+                return "Capturado por el vigilante en " + toString(e.at);
             }
 
             return "Evento desconocido";
