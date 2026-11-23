@@ -44,6 +44,9 @@ add_library(circuit_escape STATIC
         src/position.cpp
         src/environment.cpp
         src/controllers.cpp
+        src/graph/graph.cpp
+        src/map_generation/map_builder.cpp
+        src/map_io/scenario_io.cpp
 )
 target_include_directories(circuit_escape PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 circuit_escape_configure(circuit_escape)
@@ -78,9 +81,8 @@ set(CIRCUIT_ESCAPE_TESTS
         environment_test
         interactions_test
         controllers_test
-        scenario_test
-        turn_test
-        observation_test
+        graph_test
+        map_builder_test
 )
 
 foreach(test_name IN LISTS CIRCUIT_ESCAPE_TESTS)

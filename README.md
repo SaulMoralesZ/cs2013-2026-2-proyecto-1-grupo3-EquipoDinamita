@@ -153,8 +153,9 @@ terminal integrada de CLion o agregar la carpeta `bin` de CMake al `PATH`.
 | `environment_test` | movimiento, costos configurados, acciones disponibles, perfiles, término de la partida y su precedencia |
 | `interactions_test` | recursos, baterías, trampas y eventos generados |
 | `controllers_test` | controladores aleatorio y heurístico, reproducibilidad con la misma semilla |
-| `ui_test` | traducción de teclas sin distinguir mayúsculas, rechazo de comandos desconocidos sin modificar el entorno, glifos emoji y ASCII (celdas, vigilante e interruptores), tableros de cualquier tamaño, ayuda H sin avanzar turno, tamaño mínimo de terminal |
-
+| `ui_test` | traducción de teclas sin distinguir mayúsculas, rechazo de comandos desconocidos sin modificar el entorno, glifos emoji y ASCII de las 7 celdas, tablero 20×30 de 62 columnas |
+| `graph_test` | DisjointSet (union/find, compresión de camino), grafo del mapa (vecinos, respeto a muros/bordes, índices) |
+| `map_builder_test` | validación de dimensiones (incl. borde `max_side`), construcción con Kruskal, reproducibilidad por semilla, invariantes (una `Exit`, elementos transitables y distintos), conversión `Action ↔ char`, serialización/deserialización, `to_scenario`, guardado/carga |
 `ui_test` se ejecuta sin abrir una terminal interactiva: renderiza en una pantalla de FTXUI en
 memoria.
 
@@ -294,6 +295,59 @@ Los escenarios están en `assets/maps/` como texto plano, una fila por línea:
 | `S` | salida (exactamente una) |
 | `@` | posición inicial del agente (exactamente una) |
 
+### Formato de escenario (Proyecto 2)
+
+Los mapas generados automáticamente por `map_generator` se guardan en `assets/maps/`
+(`mapa_facil.txt`, `mapa_medio.txt`, `mapa_dificil.txt`) con el siguiente formato
+de texto plano:
+
+```
+rows: 10
+cols: 15
+id: 1
+seed: 42
+level: easy
+energy_initial: 80
+energy_max: 80
+turn_limit: 240
+base_cost: 1
+rough_cost: 2
+min_cost: 10
+start: 0 1
+switch_a: 2 3
+switch_b: 4 5
+exit: 8 14
+vigilante: 6 7
+winning_play: UURDDW
+grid:
+##############################
+#@......#....................#
+#..~~~..#....................#
+...
+```
+
+**Campos:**
+- `rows`, `cols`: dimensiones del tablero (sin recompilar).
+- `id`: identificador del mapa (no cambia durante la generación).
+- `seed`: semilla usada para la generación con Kruskal (permite repetir el mapa).
+- `level`: nivel de dificultad (`easy`, `standard`, `hard`).
+- `energy_initial`, `energy_max`: energía inicial y máxima del jugador.
+- `turn_limit`: límite de turnos.
+- `base_cost`, `rough_cost`: costos de terreno.
+- `min_cost`: costo mínimo calculado con Dijkstra.
+- `start`, `switch_a`, `switch_b`, `exit`, `vigilante`: posiciones (fila columna).
+- `winning_play`: lista de acciones del jugador que gana la partida (`U` arriba, `D` abajo,
+  `L` izquierda, `R` derecha, `W` esperar), sin separadores, siempre en mayúscula.
+  Vacío significa "sin victoria comprobada" (ese mapa no se habilita como nivel).
+- `grid`: cuadrícula con los símbolos de celda del proyecto 1 (`#`, `.`, `~`, `R`, `B`, `T`,
+  `S`, `@`).
+
+**Reutilización:** la conversión `char → Cell` reutiliza `cellFromChar` del proyecto 1.
+La conversión `Action ↔ char` se hace con `action_to_char` / `char_to_action`
+(`U/D/L/R/W`).
+
+---
+
 ---
 
 
@@ -304,8 +358,16 @@ Los escenarios están en `assets/maps/` como texto plano, una fila por línea:
 ├── README.md
 ├── app/main.cpp                  # aplicación: opciones, ciclo de FTXUI
 ├── include/circuit_escape/       # cabeceras (los templates viven aquí)
+│   ├── graph/                    # grafo del mapa y DisjointSet (Bloque 2)
+│   ├── map_generation/           # MapBuilder, Map, MapConfig (Bloque 2)
+│   └── map_io/                   # formato de escenario, to_scenario (Bloque 2)
 ├── src/                          # implementaciones no-template
+│   ├── graph/
+│   ├── map_generation/
+│   └── map_io/
 ├── tests/                        # pruebas ejecutadas con CTest
+│   ├── graph_test.cpp            # DisjointSet y Graph
+│   └── map_builder_test.cpp      # Kruskal, dimensiones, invariantes, serialización
 ├── assets/maps/                  # escenarios
 └── docs/
     ├── design.md                 # decisiones de diseño
