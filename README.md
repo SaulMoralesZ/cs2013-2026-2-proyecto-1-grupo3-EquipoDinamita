@@ -44,7 +44,7 @@ Para verlo, descárguelo y ábralo en [excalidraw.com](https://excalidraw.com) (
 13. [Generar los paquetes](#13-generar-los-paquetes)
 14. [Limitaciones conocidas](#14-limitaciones-conocidas)
 15. [Equipo](#15-equipo)
-16. .[Uso de IA]
+16. .[Uso de IA](#16-Uso-de-IA)
 
 ---
 
