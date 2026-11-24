@@ -56,6 +56,15 @@ los ejecutables son estáticos y el paquete incluye los mapas.
 Los paquetes se generan en cada push a `main` con GitHub Actions: pestaña **Actions** →
 ejecución más reciente de *Compilar y empaquetar* (en verde) → sección **Artifacts**:
 
+**Descarga directa** (no requiere cuenta de GitHub):
+
+| Sistema | Instalador | Portable |
+|---|---|---|
+| Linux (Ubuntu / Debian) | [Descargar `.deb`](https://github.com/SaulMoralesZ/cs2013-2026-2-proyecto-1-grupo3-EquipoDinamita/releases/latest/download/escape-circuit_1.0.0_amd64.deb) | [Descargar `.tar.gz`](https://github.com/SaulMoralesZ/cs2013-2026-2-proyecto-1-grupo3-EquipoDinamita/releases/latest/download/escape-circuit-1.0.0-linux-x86_64.tar.gz) |
+| Windows 10/11 | [Descargar `.exe`](https://github.com/SaulMoralesZ/cs2013-2026-2-proyecto-1-grupo3-EquipoDinamita/releases/latest/download/escape-circuit-1.0.0-windows-x86_64.exe) | [Descargar `.zip`](https://github.com/SaulMoralesZ/cs2013-2026-2-proyecto-1-grupo3-EquipoDinamita/releases/latest/download/escape-circuit-1.0.0-windows-x86_64.zip) |
+
+GitHub Actions compila, prueba y empaqueta el juego en cada push a `main`.
+
 | Artefacto | Contiene |
 |---|---|
 | `escape-circuit-linux` | `escape-circuit_1.0.0_amd64.deb` (instalador) y `escape-circuit-1.0.0-linux-x86_64.tar.gz` (portable) |
