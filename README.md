@@ -686,3 +686,4 @@ CPack. Los paquetes incluyen solo `mapa_facil/medio/dificil.txt` y los mapas del
 - Saul Morales
 - Rafael Vargas
 - Treicy Calsina
+- Miguel Dominguez
