@@ -100,6 +100,9 @@ if(CIRCUIT_ESCAPE_WITH_UI)
             GIT_TAG v7.0.3
             FIND_PACKAGE_ARGS 7.0.3
     )
+    # Sin las reglas de instalacion de FTXUI: si no, sus cabeceras y bibliotecas
+    # entran en los paquetes y chocan con el paquete ftxui del sistema.
+    set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(ftxui)
 
     add_library(circuit_escape_ui STATIC src/console_ui.cpp src/ui/game_application.cpp)
