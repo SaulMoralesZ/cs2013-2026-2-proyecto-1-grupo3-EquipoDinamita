@@ -44,6 +44,7 @@ Para verlo, descárguelo y ábralo en [excalidraw.com](https://excalidraw.com) (
 13. [Generar los paquetes](#13-generar-los-paquetes)
 14. [Limitaciones conocidas](#14-limitaciones-conocidas)
 15. [Equipo](#15-equipo)
+16. .[Uso de IA]
 
 ---
 
@@ -687,3 +688,8 @@ CPack. Los paquetes incluyen solo `mapa_facil/medio/dificil.txt` y los mapas del
 - Rafael Vargas
 - Treicy Calsina
 - Miguel Dominguez
+
+## 16. Uso de IA
+Claude Code: 
+- Asistente principal
+- Tareas autónomas: se encargó de la modificación y redacción parcial del README, completó el diagrama de Excalidraw y creó el icono del juego.
